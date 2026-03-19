@@ -1,7 +1,7 @@
-# Torrents Docker Stack
+# Torrents Docker Stack (ExpressVPN)
 
-[![Compose Validate](https://github.com/LBates2000/torrents-stack/actions/workflows/compose-validate.yml/badge.svg)](https://github.com/LBates2000/torrents-stack/actions/workflows/compose-validate.yml)
-[![Backup Restore Reminder](https://github.com/LBates2000/torrents-stack/actions/workflows/backup-restore-reminder.yml/badge.svg)](https://github.com/LBates2000/torrents-stack/actions/workflows/backup-restore-reminder.yml)
+[![Compose Validate](https://github.com/LBates2000/torrents-stack-expressvpn/actions/workflows/compose-validate.yml/badge.svg)](https://github.com/LBates2000/torrents-stack-expressvpn/actions/workflows/compose-validate.yml)
+[![Backup Restore Reminder](https://github.com/LBates2000/torrents-stack-expressvpn/actions/workflows/backup-restore-reminder.yml/badge.svg)](https://github.com/LBates2000/torrents-stack-expressvpn/actions/workflows/backup-restore-reminder.yml)
 
 This stack routes only qBittorrent through WireGuard.
 
@@ -123,7 +123,7 @@ docker compose up --force-recreate -d
 
 ## Backup and restore
 The repository includes a monthly reminder workflow that opens a backup/restore verification issue:
-- `Backup Restore Reminder` workflow: https://github.com/LBates2000/torrents-stack/actions/workflows/backup-restore-reminder.yml
+- `Backup Restore Reminder` workflow: https://github.com/LBates2000/torrents-stack-expressvpn/actions/workflows/backup-restore-reminder.yml
 
 Backup runtime config (PowerShell):
 ```powershell
@@ -150,11 +150,11 @@ docker compose ps --format "table {{.Name}}\t{{.State}}\t{{.Health}}\t{{.Status}
 - Redirect-based healthchecks are intentional: `301`/`302` can still mean the web UI is up before login.
 
 ## Changelog
-- `v1.0.3` (ci: bump actions/checkout to v6): https://github.com/LBates2000/torrents-stack/releases/tag/v1.0.3
-- `v1.0.2` (docs: onboarding and Jackett redirect clarifications): https://github.com/LBates2000/torrents-stack/releases/tag/v1.0.2
-- `v1.0.1` (operationally verified checkpoint): https://github.com/LBates2000/torrents-stack/releases/tag/v1.0.1
-- `v1.0.0` (hardened baseline): https://github.com/LBates2000/torrents-stack/releases/tag/v1.0.0
-- All releases: https://github.com/LBates2000/torrents-stack/releases
+- `v1.0.3` (ci: bump actions/checkout to v6): https://github.com/LBates2000/torrents-stack-expressvpn/releases/tag/v1.0.3
+- `v1.0.2` (docs: onboarding and Jackett redirect clarifications): https://github.com/LBates2000/torrents-stack-expressvpn/releases/tag/v1.0.2
+- `v1.0.1` (operationally verified checkpoint): https://github.com/LBates2000/torrents-stack-expressvpn/releases/tag/v1.0.1
+- `v1.0.0` (hardened baseline): https://github.com/LBates2000/torrents-stack-expressvpn/releases/tag/v1.0.0
+- All releases: https://github.com/LBates2000/torrents-stack-expressvpn/releases
 
 ## Project governance
 - Security policy: see `SECURITY.md`.
