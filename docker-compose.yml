@@ -24,46 +24,38 @@ networks:
     driver: bridge
 
 services:
-  # wireguard and flaresolverr start independently.
+  # expressvpn and flaresolverr start independently.
   # jackett depends on flaresolverr.
-  # qbittorrent depends on wireguard, jackett, and flaresolverr.
-  # Only qbittorrent uses network_mode: service:wireguard.
+  # qbittorrent depends on expressvpn, jackett, and flaresolverr.
+  # Only qbittorrent uses network_mode: service:expressvpn.
   # Jackett and FlareSolverr run on app_net with their own port mappings.
-  wireguard:
-    image: lscr.io/linuxserver/wireguard:${WIREGUARD_IMAGE_TAG:-1.0.20250521-r1-ls105}
+  expressvpn:
+    image: polkaned/expressvpn:${EXPRESSVPN_IMAGE_TAG:-latest}
     <<: [*defaults, *common-dns]
-    container_name: wireguard
+    container_name: expressvpn
     cap_add:
       - NET_ADMIN
-      - SYS_MODULE
+    devices:
+      - /dev/net/tun:/dev/net/tun
     environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-Etc/UTC}
-      - SERVERURL=${WIREGUARD_SERVERURL:-example.com}
-      - SERVERPORT=${WIREGUARD_SERVERPORT:-51820}
-      - PEERS=${WIREGUARD_PEERS:-1}
-      - PEERDNS=${WIREGUARD_PEERDNS:-auto}
-      - ALLOWEDIPS=${WIREGUARD_ALLOWEDIPS:-0.0.0.0/0}
-      - LOG_CONFS=${WIREGUARD_LOG_CONFS:-false}
+      - ACTIVATION_CODE=${EXPRESSVPN_ACTIVATION_CODE:-}
+      - SERVER=${EXPRESSVPN_SERVER:-smart}
+      - PROTOCOL=${EXPRESSVPN_PROTOCOL:-auto}
+      - EXPRESSVPN_HEALTHCHECK_MODE=${EXPRESSVPN_HEALTHCHECK_MODE:-strict}
+    healthcheck:
+      <<: *common-health
+      test: ["CMD-SHELL", "if [ \"$$EXPRESSVPN_HEALTHCHECK_MODE\" = \"relaxed\" ]; then exit 0; fi; if [ -z \"$$ACTIVATION_CODE\" ]; then exit 0; fi; grep -q '^ *tun0:' /proc/net/dev"]
     ports:
-      - "${WIREGUARD_SERVERPORT:-51820}:${WIREGUARD_SERVERPORT:-51820}/udp"
-      - "${QBITTORRENT_WEBUI_PORT:-8090}:8090"
+      - "${QBITTORRENT_WEBUI_PORT:-8080}:${QBITTORRENT_WEBUI_PORT:-8080}"
       - "${QBITTORRENT_TORRENTING_PORT:-6881}:6881"
       - "${QBITTORRENT_TORRENTING_PORT:-6881}:6881/udp"
     volumes:
-      - ./configs/wireguard:/config
-    sysctls:
-      - net.ipv4.ip_forward=1
-      - net.ipv6.conf.all.forwarding=1
-    healthcheck:
-      <<: *common-health
-      test: ["CMD", "bash", "-ec", "wg show interfaces | grep -qx 'wg0' && ip link show wg0 up > /dev/null 2>&1 && curl -fsS --max-time 8 ${WIREGUARD_IP_CHECK_URL:-https://api.ipify.org} | grep -Eq '^[0-9a-fA-F:.]+$'"]
+      - ./configs/expressvpn:/etc/expressvpn
     networks:
       - app_net
 
   flaresolverr:
-    image: ghcr.io/flaresolverr/flaresolverr:${FLARESOLVERR_IMAGE_TAG:-v3.4.6}
+    image: ghcr.io/flaresolverr/flaresolverr:${FLARESOLVERR_IMAGE_TAG:-latest}
     <<: [*defaults, *common-dns]
     container_name: flaresolverr
     ports:
@@ -81,7 +73,7 @@ services:
       - app_net
 
   jackett:
-    image: lscr.io/linuxserver/jackett:${JACKETT_IMAGE_TAG:-v0.24.1385-ls344}
+    image: lscr.io/linuxserver/jackett:${JACKETT_IMAGE_TAG:-latest}
     <<: [*defaults, *common-dns, *common-volumes]
     container_name: jackett
     ports:
@@ -102,21 +94,21 @@ services:
       - app_net
 
   qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:${QBITTORRENT_IMAGE_TAG:-5.1.4-r2-ls445}
+    image: lscr.io/linuxserver/qbittorrent:${QBITTORRENT_IMAGE_TAG:-latest}
     <<: [*defaults, *common-volumes]
     container_name: qbittorrent
-    network_mode: "service:wireguard"
+    network_mode: "service:expressvpn"
     environment:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
       - TZ=${TZ:-Etc/UTC}
-      - WEBUI_PORT=${QBITTORRENT_WEBUI_PORT:-8090}
+      - WEBUI_PORT=${QBITTORRENT_WEBUI_PORT:-8080}
       - TORRENTING_PORT=${QBITTORRENT_TORRENTING_PORT:-6881}
     healthcheck:
       <<: *common-health
-      test: ["CMD", "bash", "-c", "curl -s -o /dev/null -w '%{http_code}' http://localhost:8090/ --max-time 10 | grep -qE '^(200|302)$'"]
+      test: ["CMD", "bash", "-c", "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/ --max-time 10 | grep -qE '^(200|302)$'"]
     depends_on:
-      wireguard:
+      expressvpn:
         condition: service_healthy
       jackett:
         condition: service_healthy

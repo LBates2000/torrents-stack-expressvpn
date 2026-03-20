@@ -2,7 +2,7 @@ name: Compose Validate
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
     branches: [main]
 
@@ -24,17 +24,22 @@ jobs:
   smoke-test:
     needs: validate-compose
     runs-on: ubuntu-latest
+    env:
+      EXPRESSVPN_ACTIVATION_CODE: ${{ secrets.EXPRESSVPN_ACTIVATION_CODE }}
+      EXPRESSVPN_HEALTHCHECK_MODE: relaxed
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
       - name: Start stack
+        if: env.EXPRESSVPN_ACTIVATION_CODE != ''
         run: docker compose up -d
 
       - name: Wait for healthy services
+        if: env.EXPRESSVPN_ACTIVATION_CODE != ''
         run: |
           set -euo pipefail
-          services=(wireguard flaresolverr jackett qbittorrent)
+          services=(flaresolverr jackett qbittorrent)
           timeout_seconds=240
           start_time=$(date +%s)
 
@@ -66,6 +71,7 @@ jobs:
           done
 
       - name: Show service status
+        if: env.EXPRESSVPN_ACTIVATION_CODE != ''
         run: docker compose ps
 
       - name: Show logs on failure

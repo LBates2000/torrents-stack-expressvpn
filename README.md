@@ -3,24 +3,38 @@
 [![Compose Validate](https://github.com/LBates2000/torrents-stack-expressvpn/actions/workflows/compose-validate.yml/badge.svg)](https://github.com/LBates2000/torrents-stack-expressvpn/actions/workflows/compose-validate.yml)
 [![Backup Restore Reminder](https://github.com/LBates2000/torrents-stack-expressvpn/actions/workflows/backup-restore-reminder.yml/badge.svg)](https://github.com/LBates2000/torrents-stack-expressvpn/actions/workflows/backup-restore-reminder.yml)
 
-This stack routes only qBittorrent through WireGuard.
+This stack routes only qBittorrent through ExpressVPN.
 
 ## How it works
-- `wireguard` is the VPN gateway.
-- `qbittorrent` uses `network_mode: "service:wireguard"`, so torrent traffic goes through WireGuard.
+- `expressvpn` is the VPN gateway.
+- `qbittorrent` uses `network_mode: "service:expressvpn"`, so torrent traffic goes through ExpressVPN.
 - `jackett` and `flaresolverr` run on `app_net` and expose their own ports.
 - Host access is published by the compose port mappings.
 
 ## Access
-- qBittorrent Web UI: http://localhost:8090
+- qBittorrent Web UI: http://localhost:8080
 - Jackett UI: http://localhost:9117
 - Note: Jackett may return `301`/`302` redirects to login; this is expected.
 - FlareSolverr API: http://localhost:8191
 
+## ExpressVPN prerequisites
+- Active ExpressVPN subscription and activation code.
+- Docker host that supports `NET_ADMIN` and `/dev/net/tun` for VPN tunneling.
+- Set `EXPRESSVPN_ACTIVATION_CODE` in `.env` before first startup.
+- Optional but recommended: set `EXPRESSVPN_SERVER` and `EXPRESSVPN_PROTOCOL` in `.env`.
+- `EXPRESSVPN_SERVER` examples: `smart`, `usa-newyork`, `uk-london` (use values supported by your account/container image).
+
+Example `.env` values:
+```env
+EXPRESSVPN_ACTIVATION_CODE=YOUR_CODE_HERE
+EXPRESSVPN_SERVER=smart
+EXPRESSVPN_PROTOCOL=auto
+```
+
 ## First-time setup
 - Install Docker Desktop (or Docker Engine + Compose plugin).
-- Configure WireGuard using `.env` values (server mode defaults are provided in `.env.example`).
-- Optional: if you are running in client mode, place your WireGuard client config in `./configs/wireguard/` (for example `wg0.conf`).
+- Set your ExpressVPN activation code/server/protocol using `.env` values from `.env.example`.
+- Optional: place persistent ExpressVPN state in `./configs/expressvpn/`.
 - Copy `.env.example` to `.env` and adjust values for your host/network.
 - Start the stack with `docker compose up -d`.
 
@@ -70,19 +84,19 @@ docker compose up --force-recreate -d
 - Torrent downloads are stored in `./downloads`.
 
 ## Image pinning
-- Images are pinned by default in `docker-compose.yml` via environment-backed tags.
-- Override image versions in `.env` using `WIREGUARD_IMAGE_TAG`, `FLARESOLVERR_IMAGE_TAG`, `JACKETT_IMAGE_TAG`, and `QBITTORRENT_IMAGE_TAG`.
+- Images default to `latest` in `docker-compose.yml` via environment-backed tags.
+- Override image tags in `.env` using `EXPRESSVPN_IMAGE_TAG`, `FLARESOLVERR_IMAGE_TAG`, `JACKETT_IMAGE_TAG`, and `QBITTORRENT_IMAGE_TAG`.
 
 ## Startup order
-- `wireguard` and `flaresolverr` start independently (no dependencies).
+- `expressvpn` and `flaresolverr` start independently (no dependencies).
 - `jackett` depends on `flaresolverr`.
-- `qbittorrent` depends on `wireguard`, `jackett`, and `flaresolverr`.
+- `qbittorrent` waits for `expressvpn`, `jackett`, and `flaresolverr` to be healthy.
 
 ## Healthchecks (service-specific)
-- `wireguard`: checks that `wg0` exists, the interface is up, and a public IP is returned from `${WIREGUARD_IP_CHECK_URL:-https://api.ipify.org}`
+- `expressvpn`: default `strict` mode checks `tun0` in `/proc/net/dev` when `ACTIVATION_CODE` is set; set `EXPRESSVPN_HEALTHCHECK_MODE=relaxed` to bypass in CI/dev.
 - `flaresolverr`: checks `http://localhost:8191`
 - `jackett`: checks `http://localhost:9117/` and accepts `200`, `301`, or `302`
-- `qbittorrent`: checks `http://localhost:8090/` and accepts `200` or `302`
+- `qbittorrent`: checks `http://localhost:8080/` and accepts `200` or `302`
 
 ## Startup timing (observed)
 - Typical clean startup on this host: ~70-80 seconds.
@@ -102,21 +116,21 @@ docker compose up --force-recreate -d
 - Health-focused status: `docker compose ps --format "table {{.Name}}\t{{.State}}\t{{.Health}}\t{{.Status}}"`
 - Timed startup (PowerShell): `$t = Measure-Command { docker compose up -d }; $t.TotalSeconds`
 - Tail all logs: `docker compose logs -f`
-- Tail one service: `docker compose logs -f wireguard` (or `flaresolverr`, `jackett`, `qbittorrent`)
+- Tail one service: `docker compose logs -f expressvpn` (or `flaresolverr`, `jackett`, `qbittorrent`)
 
 ## Incident runbook
 - Symptom: stack did not start
 	- Command: `docker compose ps`
 	- Expected: all services `running` and `healthy`
 - Symptom: qBittorrent UI unavailable
-	- Command: `docker compose logs --tail=100 qbittorrent wireguard`
-	- Expected: `wireguard` healthy and `qbittorrent` serving on `http://localhost:8090/`
+	- Command: `docker compose logs --tail=100 qbittorrent expressvpn`
+	- Expected: `expressvpn` is running and `qbittorrent` serving on `http://localhost:8080/`
 - Symptom: Jackett API/UI failing
 	- Command: `docker compose logs --tail=100 jackett flaresolverr`
 	- Expected: `jackett` healthcheck returns `200|301|302` and `flaresolverr` is ready
 - Symptom: VPN routing suspected down
-	- Command: `docker compose exec wireguard wg show`
-	- Expected: active `wg0` interface and peer/session data present
+	- Command: `docker compose logs --tail=100 expressvpn`
+	- Expected: active ExpressVPN connection for the configured server/protocol
 - Emergency rollback
 	- Command: `git checkout v1.0.0; docker compose down; docker compose up -d`
 	- Expected: stack returns to last tagged baseline
@@ -145,11 +159,12 @@ docker compose ps --format "table {{.Name}}\t{{.State}}\t{{.Health}}\t{{.Status}
 ```
 
 ## Notes
-- If you change WireGuard peer config, restart the `wireguard` container.
-- Keep `wireguard` service healthy before app services start.
+- If you change ExpressVPN activation/server/protocol values, restart the `expressvpn` container.
+- Keep `expressvpn` service running before app services start.
 - Redirect-based healthchecks are intentional: `301`/`302` can still mean the web UI is up before login.
 
 ## Changelog
+- `v1.0.4` (compose/docs: add `expressvpn` healthcheck and require `qbittorrent` to wait for `expressvpn` health): https://github.com/LBates2000/torrents-stack-expressvpn/releases/tag/v1.0.4
 - `v1.0.3` (ci: bump actions/checkout to v6): https://github.com/LBates2000/torrents-stack-expressvpn/releases/tag/v1.0.3
 - `v1.0.2` (docs: onboarding and Jackett redirect clarifications): https://github.com/LBates2000/torrents-stack-expressvpn/releases/tag/v1.0.2
 - `v1.0.1` (operationally verified checkpoint): https://github.com/LBates2000/torrents-stack-expressvpn/releases/tag/v1.0.1
