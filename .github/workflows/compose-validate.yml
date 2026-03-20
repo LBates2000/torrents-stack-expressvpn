@@ -22,20 +22,21 @@ jobs:
         run: docker compose -f docker-compose.yml config
 
   smoke-test:
-    if: ${{ secrets.EXPRESSVPN_ACTIVATION_CODE != '' }}
     needs: validate-compose
     runs-on: ubuntu-latest
+    env:
+      EXPRESSVPN_ACTIVATION_CODE: ${{ secrets.EXPRESSVPN_ACTIVATION_CODE }}
+      EXPRESSVPN_HEALTHCHECK_MODE: relaxed
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
       - name: Start stack
-        env:
-          EXPRESSVPN_ACTIVATION_CODE: ${{ secrets.EXPRESSVPN_ACTIVATION_CODE }}
-          EXPRESSVPN_HEALTHCHECK_MODE: relaxed
+        if: env.EXPRESSVPN_ACTIVATION_CODE != ''
         run: docker compose up -d
 
       - name: Wait for healthy services
+        if: env.EXPRESSVPN_ACTIVATION_CODE != ''
         run: |
           set -euo pipefail
           services=(flaresolverr jackett qbittorrent)
@@ -70,6 +71,7 @@ jobs:
           done
 
       - name: Show service status
+        if: env.EXPRESSVPN_ACTIVATION_CODE != ''
         run: docker compose ps
 
       - name: Show logs on failure
