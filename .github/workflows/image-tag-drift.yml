@@ -66,8 +66,15 @@ jobs:
                   })
                   continue
 
-                    if pinned.lower() == "latest":
-                      continue
+              if pinned.lower() == "latest":
+                  outdated.append({
+                      "service": service,
+                      "env_key": env_key,
+                      "pinned": pinned,
+                      "latest": "<not-evaluated>",
+                      "reason": "Configured tag is 'latest', so version drift cannot be meaningfully checked",
+                  })
+                  continue
 
               run(["docker", "pull", f"{image}:latest"])
               inspect = run([
@@ -103,6 +110,13 @@ jobs:
             const title = "[Image Tags] Configured tag drift detected";
             const outdated = JSON.parse(process.env.OUTDATED_JSON || "[]");
 
+            const versionDrift = outdated.filter(item =>
+              item.reason === "Configured tag differs from latest image version"
+            );
+            const policyConfigDrift = outdated.filter(item =>
+              item.reason !== "Configured tag differs from latest image version"
+            );
+
             const { data: openIssues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -116,16 +130,34 @@ jobs:
               return;
             }
 
-            const rows = outdated.map(item =>
+            const toRows = (items) => items.map(item =>
               `| ${item.service} | ${item.env_key} | ${item.pinned} | ${item.latest} | ${item.reason} |`
             ).join("\n");
 
+            const versionRows = versionDrift.length
+              ? toRows(versionDrift)
+              : "| _none_ | _none_ | _none_ | _none_ | _none_ |";
+
+            const policyRows = policyConfigDrift.length
+              ? toRows(policyConfigDrift)
+              : "| _none_ | _none_ | _none_ | _none_ | _none_ |";
+
             const body = [
-              "Configured image tags differ from upstream latest image versions.",
+              "Detected image tag drift findings.",
+              "",
+              "## Version Drift",
+              "Configured tag differs from upstream latest image version.",
               "",
               "| Service | Variable | Pinned | Latest | Reason |",
               "|---|---|---|---|---|",
-              rows,
+              versionRows,
+              "",
+              "## Policy/Config Drift",
+              "Configuration state that prevents or weakens version drift checks (for example `latest` or missing tag values).",
+              "",
+              "| Service | Variable | Pinned | Latest | Reason |",
+              "|---|---|---|---|---|",
+              policyRows,
               "",
               "Suggested actions:",
               "- Review release notes for each image",
