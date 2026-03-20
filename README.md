@@ -182,6 +182,7 @@ docker compose ps --format "table {{.Name}}\t{{.State}}\t{{.Health}}\t{{.Status}
 - Redirect-based healthchecks are intentional: `301`/`302` can still mean the web UI is up before login.
 
 ## Changelog
+- `v1.0.5` (compose: full env parity, parameterize container names/healthcheck/network; fix image-tag-drift indentation; improve drift issue triage layout): pending release
 - `v1.0.4` (compose/docs: add `expressvpn` healthcheck and require `qbittorrent` to wait for `expressvpn` health): https://github.com/LBates2000/torrents-stack-expressvpn/releases/tag/v1.0.4
 - `v1.0.3` (ci: bump actions/checkout to v6): https://github.com/LBates2000/torrents-stack-expressvpn/releases/tag/v1.0.3
 - `v1.0.2` (docs: onboarding and Jackett redirect clarifications): https://github.com/LBates2000/torrents-stack-expressvpn/releases/tag/v1.0.2
