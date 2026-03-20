@@ -5,6 +5,20 @@
 
 This stack routes only qBittorrent through ExpressVPN.
 
+## Wrapper script
+- Primary entrypoint: `pwsh ./scripts/torrents-stack.ps1 <command>`
+- Common commands: `start`, `stop`, `restart`, `update`, `status`, `logs`, `sync`
+- Example: `pwsh ./scripts/torrents-stack.ps1 start`
+
+## Secrets handling
+- Keep real secrets only in local `.env`; do not commit them to git.
+- `.env` is intentionally ignored by `.gitignore`; `.env.example` is the safe template to commit.
+- Sensitive values in this stack include `EXPRESSVPN_ACTIVATION_CODE`, `JACKETT_CFG_API_KEY`, and `JACKETT_CFG_OMDB_API_KEY`.
+- Enable the local pre-commit guardrail once per clone: `git config core.hooksPath .githooks`.
+- The repo includes `.githooks/pre-commit` to block commits that stage `.env`.
+- CI also enforces this with `.github/workflows/prevent-env-tracking.yml`.
+- Before committing, run `git status --short` and confirm `.env` is not listed.
+
 ## How it works
 - `expressvpn` is the VPN gateway.
 - `qbittorrent` uses `network_mode: "service:expressvpn"`, so torrent traffic goes through ExpressVPN.
@@ -21,39 +35,39 @@ This stack routes only qBittorrent through ExpressVPN.
 - Active ExpressVPN subscription and activation code.
 - Docker host that supports `NET_ADMIN` and `/dev/net/tun` for VPN tunneling.
 - Set `EXPRESSVPN_ACTIVATION_CODE` in `.env` before first startup.
-- Optional but recommended: set `EXPRESSVPN_SERVER` and `EXPRESSVPN_PROTOCOL` in `.env`.
-- `EXPRESSVPN_SERVER` examples: `smart`, `usa-newyork`, `uk-london` (use values supported by your account/container image).
+- `EXPRESSVPN_REGION`: set a valid region alias, e.g. `uk-docklands`.
+- `EXPRESSVPN_PROTOCOL`: use `auto` (recommended) or set `lightwayudp`, `lightwaytcp`, `openvpnudp`, `openvpntcp`, or `wireguard`.
 
 Example `.env` values:
 ```env
 EXPRESSVPN_ACTIVATION_CODE=YOUR_CODE_HERE
-EXPRESSVPN_SERVER=smart
+EXPRESSVPN_REGION=uk-docklands
 EXPRESSVPN_PROTOCOL=auto
 ```
 
 ## First-time setup
 - Install Docker Desktop (or Docker Engine + Compose plugin).
-- Set your ExpressVPN activation code/server/protocol using `.env` values from `.env.example`.
+- Set your ExpressVPN activation code using `.env` values from `.env.example`.
 - Copy `.env.example` to `.env` and adjust values for your host/network.
-- Start the stack with `docker compose up -d`.
+- The sync/start scripts auto-create missing runtime directories and seed config files under `HOST_CONFIGS_DIR` and `HOST_DOWNLOADS_DIR`.
+- Start the stack with `pwsh ./scripts/torrents-stack.ps1 start`.
 
 ### Quick start
 #### Bash
 ```bash
 cp .env.example .env
-docker compose up -d
+pwsh ./scripts/torrents-stack.ps1 start
 ```
 
 #### PowerShell
 ```powershell
 Copy-Item .env.example .env -Force
-docker compose up -d
+pwsh ./scripts/torrents-stack.ps1 start
 ```
 
 ## Commands
-- Start: `docker compose up -d`
-- Stop: `docker compose down`
-- Check: `docker compose ps`
+- Use the wrapper script section above for the primary lifecycle commands.
+- For lower-level operations (rebuild/reset), use the `docker compose` flows below.
 
 ## Rebuild options
 Full rebuild with fresh images:
@@ -79,8 +93,8 @@ docker compose up --force-recreate -d
 ```
 
 ## Config directories
-- Local data is mounted from `./configs`.
-- Torrent downloads are stored in `./downloads`.
+- Local data is mounted from `HOST_CONFIGS_DIR` to `CONTAINER_CONFIGS_DIR` (defaults: `./configs` -> `/config`).
+- Torrent downloads are stored from `HOST_DOWNLOADS_DIR` to `CONTAINER_DOWNLOADS_DIR` (defaults: `./downloads` -> `/downloads`).
 
 ## Image pinning
 - Images default to `latest` in `docker-compose.yml` via environment-backed tags.
@@ -88,9 +102,35 @@ docker compose up --force-recreate -d
 
 ## Advanced env overrides
 - Network driver: `APP_NET_DRIVER` (default: `bridge`)
+- Host bind mount directories: `HOST_CONFIGS_DIR`, `HOST_DOWNLOADS_DIR`
+- Container bind mount targets: `CONTAINER_CONFIGS_DIR`, `CONTAINER_DOWNLOADS_DIR`
+- ExpressVPN entrypoint script mount: `HOST_EXPRESSVPN_ENTRYPOINT_SCRIPT`
 - Container names: `EXPRESSVPN_CONTAINER_NAME`, `FLARESOLVERR_CONTAINER_NAME`, `JACKETT_CONTAINER_NAME`, `QBITTORRENT_CONTAINER_NAME`
 - Shared healthcheck defaults: `HEALTHCHECK_INTERVAL`, `HEALTHCHECK_TIMEOUT`, `HEALTHCHECK_RETRIES`, `HEALTHCHECK_START_PERIOD`
 - If you customize container names, update any external scripts/automation that reference those container names directly.
+
+### Jackett config via env
+- `jackett` now bootstraps `ServerConfig.json` from `.env` values (`JACKETT_CFG_*`) at container startup.
+- Defaults match the existing `ServerConfig.json` values.
+- `JACKETT_CFG_API_KEY` and `JACKETT_CFG_INSTANCE_ID` default to `null` (auto-generated), but can be set to static values for persistence.
+- `JACKETT_CFG_BLACKHOLE_DIR` defaults to `CONTAINER_DOWNLOADS_DIR/watch`.
+- `JACKETT_CFG_OMDB_API_URL` defaults to `https://www.omdbapi.com/`.
+- `JACKETT_CFG_FLARESOLVERR_URL` defaults to `http://flaresolverr:8191` (service-name routing on the compose network).
+- Proxy type UI hint: `JACKETT_CFG_PROXY_TYPE` uses `0=None`, `1=Http`, `2=Socks5`.
+- Run `pwsh ./scripts/sync-jackett-config.ps1` to sync `configs/Jackett/ServerConfig.json` from `.env` (`APIKey`, `InstanceId`, `BlackholeDir`, `OmdbApiKey`, `OmdbApiUrl`, `FlareSolverrUrl`).
+- The script restarts `jackett` only when values changed and the service is running.
+- Use `pwsh ./scripts/sync-jackett-config.ps1 -SkipRestart` to sync without restart.
+
+### qBittorrent config via env
+- Use `.env` values (`QBITTORRENT_CFG_*`) to manage `configs/qBittorrent/qBittorrent.conf`.
+- Use `QBITTORRENT_CFG_CATEGORIES_JSON` to populate `configs/qBittorrent/categories.json`.
+- Use `QBITTORRENT_CFG_WATCHED_FOLDERS_JSON` to populate `configs/qBittorrent/watched_folders.json`.
+- If either JSON env var is empty, the script auto-generates defaults from `QBITTORRENT_CFG_DOWNLOADS_SAVE_PATH`:
+  - Categories: `movies -> <SavePath>/movies`, `tv -> <SavePath>/tv`
+  - Watched folders: `<SavePath>/watch/movies` and `<SavePath>/watch/tv`
+- Run `pwsh ./scripts/sync-qbittorrent-config.ps1` to sync config from `.env`.
+- The script restarts `qbittorrent` only when `qBittorrent.conf`, `categories.json`, or `watched_folders.json` changed and the service is running.
+- Use `pwsh ./scripts/sync-qbittorrent-config.ps1 -SkipRestart` to sync without restart.
 
 Example custom overrides:
 ```env
@@ -130,11 +170,11 @@ HEALTHCHECK_START_PERIOD=45s
 - If startup exceeds 2-3 minutes, check logs.
 
 ### Quick diagnostics
-- Overall status: `docker compose ps`
+- Overall status: `pwsh ./scripts/torrents-stack.ps1 status`
 - Health-focused status: `docker compose ps --format "table {{.Name}}\t{{.State}}\t{{.Health}}\t{{.Status}}"`
 - Timed startup (PowerShell): `$t = Measure-Command { docker compose up -d }; $t.TotalSeconds`
-- Tail all logs: `docker compose logs -f`
-- Tail one service: `docker compose logs -f expressvpn` (or `flaresolverr`, `jackett`, `qbittorrent`)
+- Tail all logs: `pwsh ./scripts/torrents-stack.ps1 logs`
+- Tail one service: `pwsh ./scripts/torrents-stack.ps1 logs -Service expressvpn` (or `flaresolverr`, `jackett`, `qbittorrent`)
 
 ## Incident runbook
 - Symptom: stack did not start
@@ -177,7 +217,7 @@ docker compose ps --format "table {{.Name}}\t{{.State}}\t{{.Health}}\t{{.Status}
 ```
 
 ## Notes
-- If you change ExpressVPN activation/server/protocol values, restart the `expressvpn` container.
+- If you change ExpressVPN activation/region/protocol values, restart the `expressvpn` container.
 - Keep `expressvpn` service running before app services start.
 - Redirect-based healthchecks are intentional: `301`/`302` can still mean the web UI is up before login.
 
