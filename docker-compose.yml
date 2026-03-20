@@ -41,9 +41,10 @@ services:
       - ACTIVATION_CODE=${EXPRESSVPN_ACTIVATION_CODE:-}
       - SERVER=${EXPRESSVPN_SERVER:-smart}
       - PROTOCOL=${EXPRESSVPN_PROTOCOL:-auto}
+      - EXPRESSVPN_HEALTHCHECK_MODE=${EXPRESSVPN_HEALTHCHECK_MODE:-strict}
     healthcheck:
       <<: *common-health
-      test: ["CMD-SHELL", "if [ -z \"$$ACTIVATION_CODE\" ]; then exit 0; fi; grep -q '^ *tun0:' /proc/net/dev"]
+      test: ["CMD-SHELL", "if [ \"$$EXPRESSVPN_HEALTHCHECK_MODE\" = \"relaxed\" ]; then exit 0; fi; if [ -z \"$$ACTIVATION_CODE\" ]; then exit 0; fi; grep -q '^ *tun0:' /proc/net/dev"]
     ports:
       - "${QBITTORRENT_WEBUI_PORT:-8080}:${QBITTORRENT_WEBUI_PORT:-8080}"
       - "${QBITTORRENT_TORRENTING_PORT:-6881}:6881"
