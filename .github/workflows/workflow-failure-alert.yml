@@ -6,6 +6,7 @@ on:
       - Compose Validate
       - Backup Restore Reminder
       - Image Tag Drift Check
+      - Dependabot Monthly Review
     types:
       - completed
 
