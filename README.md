@@ -93,7 +93,7 @@ docker compose up --force-recreate -d
 - `qbittorrent` waits for `expressvpn`, `jackett`, and `flaresolverr` to be healthy.
 
 ## Healthchecks (service-specific)
-- `expressvpn`: checks for `tun0` in `/proc/net/dev` to confirm VPN tunnel interface presence.
+- `expressvpn`: if `ACTIVATION_CODE` is set, checks for `tun0` in `/proc/net/dev`; if empty, reports healthy (CI/dev fallback).
 - `flaresolverr`: checks `http://localhost:8191`
 - `jackett`: checks `http://localhost:9117/` and accepts `200`, `301`, or `302`
 - `qbittorrent`: checks `http://localhost:8080/` and accepts `200` or `302`

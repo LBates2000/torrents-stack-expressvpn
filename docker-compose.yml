@@ -43,7 +43,7 @@ services:
       - PROTOCOL=${EXPRESSVPN_PROTOCOL:-auto}
     healthcheck:
       <<: *common-health
-      test: ["CMD-SHELL", "grep -q '^ *tun0:' /proc/net/dev"]
+      test: ["CMD-SHELL", "if [ -z \"$$ACTIVATION_CODE\" ]; then exit 0; fi; grep -q '^ *tun0:' /proc/net/dev"]
     ports:
       - "${QBITTORRENT_WEBUI_PORT:-8080}:${QBITTORRENT_WEBUI_PORT:-8080}"
       - "${QBITTORRENT_TORRENTING_PORT:-6881}:6881"
