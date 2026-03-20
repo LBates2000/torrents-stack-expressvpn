@@ -2,7 +2,7 @@ name: Compose Validate
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
     branches: [main]
 
