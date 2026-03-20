@@ -16,7 +16,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Detect drift between pinned tags and latest image versions
+      - name: Detect drift between configured tags and latest image versions
         id: drift
         shell: bash
         run: |
@@ -47,7 +47,7 @@ jobs:
           env = load_env(ENV_FILE)
 
           checks = [
-              ("WIREGUARD_IMAGE_TAG", "lscr.io/linuxserver/wireguard", "wireguard"),
+              ("EXPRESSVPN_IMAGE_TAG", "polkaned/expressvpn", "expressvpn"),
               ("FLARESOLVERR_IMAGE_TAG", "ghcr.io/flaresolverr/flaresolverr", "flaresolverr"),
               ("JACKETT_IMAGE_TAG", "lscr.io/linuxserver/jackett", "jackett"),
               ("QBITTORRENT_IMAGE_TAG", "lscr.io/linuxserver/qbittorrent", "qbittorrent"),
@@ -62,9 +62,12 @@ jobs:
                       "env_key": env_key,
                       "pinned": "<missing>",
                       "latest": "<unknown>",
-                      "reason": "Missing pinned tag in .env.example",
+                      "reason": "Missing configured tag in .env.example",
                   })
                   continue
+
+                    if pinned.lower() == "latest":
+                      continue
 
               run(["docker", "pull", f"{image}:latest"])
               inspect = run([
@@ -79,7 +82,7 @@ jobs:
                       "env_key": env_key,
                       "pinned": pinned,
                       "latest": latest_version,
-                      "reason": "Pinned tag differs from latest image version",
+                      "reason": "Configured tag differs from latest image version",
                   })
 
           output_file = os.environ["GITHUB_OUTPUT"]
@@ -97,7 +100,7 @@ jobs:
           OUTDATED_JSON: ${{ steps.drift.outputs.outdated_json }}
         with:
           script: |
-            const title = "[Image Tags] Pinned tag drift detected";
+            const title = "[Image Tags] Configured tag drift detected";
             const outdated = JSON.parse(process.env.OUTDATED_JSON || "[]");
 
             const { data: openIssues } = await github.rest.issues.listForRepo({
@@ -118,7 +121,7 @@ jobs:
             ).join("\n");
 
             const body = [
-              "Pinned image tags differ from upstream latest image versions.",
+              "Configured image tags differ from upstream latest image versions.",
               "",
               "| Service | Variable | Pinned | Latest | Reason |",
               "|---|---|---|---|---|",
