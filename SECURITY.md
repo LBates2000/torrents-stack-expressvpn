@@ -28,4 +28,6 @@ Include as much detail as possible:
 
 - Never commit real credentials, API keys, or VPN private keys.
 - Keep `.env` local and out of version control.
+- Enable the local git hook guardrail with `git config core.hooksPath .githooks`.
+- The repo includes a pre-commit hook and CI workflow to prevent `.env` from being tracked.
 - Runtime data in `configs/` and `downloads/` should stay untracked.

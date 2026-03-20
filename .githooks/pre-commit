@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+
+set -eu
+
+if git diff --cached --name-only | grep -Eq '(^|/)\.env$'; then
+  echo "ERROR: .env is staged. This file contains local secrets and must not be committed."
+  echo "Run: git restore --staged .env"
+  exit 1
+fi
+
+exit 0

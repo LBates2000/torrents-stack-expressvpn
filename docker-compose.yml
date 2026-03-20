@@ -10,8 +10,15 @@ x-dns: &common-dns
 
 x-common-volumes: &common-volumes
   volumes:
-    - ./configs:/config
-    - ./downloads:/downloads
+    - ${HOST_CONFIGS_DIR:-./configs}:${CONTAINER_CONFIGS_DIR:-/config}
+    - ${HOST_DOWNLOADS_DIR:-./downloads}:${CONTAINER_DOWNLOADS_DIR:-/downloads}
+
+x-qbittorrent-command: &qbittorrent-command
+  command: >-
+    /bin/bash -c "sleep 20 &&
+    cp /shared_data/resolv.conf /etc/resolv.conf &&
+    mkdir -p ${CONTAINER_DOWNLOADS_DIR:-/downloads}/watch ${CONTAINER_DOWNLOADS_DIR:-/downloads}/watch/movies ${CONTAINER_DOWNLOADS_DIR:-/downloads}/watch/tv &&
+    bash"
 
 x-health: &common-health
   interval: ${HEALTHCHECK_INTERVAL:-20s}
@@ -37,11 +44,20 @@ services:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
+    stdin_open: true
+    tty: true
+    privileged: true
     environment:
       - ACTIVATION_CODE=${EXPRESSVPN_ACTIVATION_CODE:-}
-      - SERVER=${EXPRESSVPN_SERVER:-smart}
+      - REGION=${EXPRESSVPN_REGION:-uk-docklands}
+      - SERVER=${EXPRESSVPN_REGION:-uk-docklands}
       - PROTOCOL=${EXPRESSVPN_PROTOCOL:-auto}
       - EXPRESSVPN_HEALTHCHECK_MODE=${EXPRESSVPN_HEALTHCHECK_MODE:-strict}
+    entrypoint: /bin/bash /tmp/entrypoint.sh
+    command: /bin/bash -c "cp /etc/resolv.conf /shared_data/resolv.conf; while true; do sleep 30; done"
+    volumes:
+      - shared-volume:/shared_data
+      - ${HOST_EXPRESSVPN_ENTRYPOINT_SCRIPT:-./scripts/expressvpn-entrypoint-fixed.sh}:/tmp/entrypoint.sh:ro
     healthcheck:
       <<: *common-health
       test: ["CMD-SHELL", "if [ \"$$EXPRESSVPN_HEALTHCHECK_MODE\" = \"relaxed\" ]; then exit 0; fi; if [ -z \"$$ACTIVATION_CODE\" ]; then exit 0; fi; grep -q '^ *tun0:' /proc/net/dev"]
@@ -82,6 +98,31 @@ services:
       - TZ=${TZ:-Etc/UTC}
       - AUTO_UPDATE=${JACKETT_AUTO_UPDATE:-true}
       - RUN_OPTS=${JACKETT_RUN_OPTS:-}
+      - JACKETT_CFG_PORT=${JACKETT_CFG_PORT:-9117}
+      - JACKETT_CFG_LOCAL_BIND_ADDRESS=${JACKETT_CFG_LOCAL_BIND_ADDRESS:-127.0.0.1}
+      - JACKETT_CFG_ALLOW_EXTERNAL=${JACKETT_CFG_ALLOW_EXTERNAL:-true}
+      - JACKETT_CFG_ALLOW_CORS=${JACKETT_CFG_ALLOW_CORS:-false}
+      - JACKETT_CFG_API_KEY=${JACKETT_CFG_API_KEY:-null}
+      - JACKETT_CFG_ADMIN_PASSWORD=${JACKETT_CFG_ADMIN_PASSWORD:-null}
+      - JACKETT_CFG_INSTANCE_ID=${JACKETT_CFG_INSTANCE_ID:-null}
+      - JACKETT_CFG_BLACKHOLE_DIR=${JACKETT_CFG_BLACKHOLE_DIR:-${CONTAINER_DOWNLOADS_DIR:-/downloads}/watch}
+      - JACKETT_CFG_UPDATE_DISABLED=${JACKETT_CFG_UPDATE_DISABLED:-false}
+      - JACKETT_CFG_UPDATE_PRERELEASE=${JACKETT_CFG_UPDATE_PRERELEASE:-false}
+      - JACKETT_CFG_BASE_PATH_OVERRIDE=${JACKETT_CFG_BASE_PATH_OVERRIDE:-null}
+      - JACKETT_CFG_BASE_URL_OVERRIDE=${JACKETT_CFG_BASE_URL_OVERRIDE:-null}
+      - JACKETT_CFG_CACHE_ENABLED=${JACKETT_CFG_CACHE_ENABLED:-true}
+      - JACKETT_CFG_CACHE_TTL=${JACKETT_CFG_CACHE_TTL:-2100}
+      - JACKETT_CFG_CACHE_MAX_RESULTS_PER_INDEXER=${JACKETT_CFG_CACHE_MAX_RESULTS_PER_INDEXER:-1000}
+      - JACKETT_CFG_FLARESOLVERR_URL=${JACKETT_CFG_FLARESOLVERR_URL:-http://flaresolverr:8191}
+      - JACKETT_CFG_FLARESOLVERR_MAX_TIMEOUT=${JACKETT_CFG_FLARESOLVERR_MAX_TIMEOUT:-55000}
+      - JACKETT_CFG_OMDB_API_KEY=${JACKETT_CFG_OMDB_API_KEY:-null}
+      - JACKETT_CFG_OMDB_API_URL=${JACKETT_CFG_OMDB_API_URL:-https://www.omdbapi.com/}
+      - JACKETT_CFG_PROXY_TYPE=${JACKETT_CFG_PROXY_TYPE:-0}
+      - JACKETT_CFG_PROXY_URL=${JACKETT_CFG_PROXY_URL:-null}
+      - JACKETT_CFG_PROXY_PORT=${JACKETT_CFG_PROXY_PORT:-null}
+      - JACKETT_CFG_PROXY_USERNAME=${JACKETT_CFG_PROXY_USERNAME:-null}
+      - JACKETT_CFG_PROXY_PASSWORD=${JACKETT_CFG_PROXY_PASSWORD:-null}
+      - JACKETT_CFG_PROXY_IS_ANONYMOUS=${JACKETT_CFG_PROXY_IS_ANONYMOUS:-true}
     healthcheck:
       <<: *common-health
       test: ["CMD", "bash", "-c", "curl -s -o /dev/null -w '%{http_code}' http://localhost:9117/ --max-time 10 | grep -qE '^(200|301|302)$'"]
@@ -93,7 +134,7 @@ services:
 
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:${QBITTORRENT_IMAGE_TAG:-latest}
-    <<: [*defaults, *common-volumes]
+    <<: [*defaults, *qbittorrent-command]
     container_name: ${QBITTORRENT_CONTAINER_NAME:-qbittorrent}
     network_mode: "service:expressvpn"
     environment:
@@ -102,6 +143,10 @@ services:
       - TZ=${TZ:-Etc/UTC}
       - WEBUI_PORT=${QBITTORRENT_WEBUI_PORT:-8080}
       - TORRENTING_PORT=${QBITTORRENT_TORRENTING_PORT:-6881}
+    volumes:
+      - ${HOST_CONFIGS_DIR:-./configs}:${CONTAINER_CONFIGS_DIR:-/config}
+      - ${HOST_DOWNLOADS_DIR:-./downloads}:${CONTAINER_DOWNLOADS_DIR:-/downloads}
+      - shared-volume:/shared_data
     healthcheck:
       <<: *common-health
       test: ["CMD", "bash", "-c", "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/ --max-time 10 | grep -qE '^(200|302)$'"]
@@ -112,3 +157,6 @@ services:
         condition: service_healthy
       flaresolverr:
         condition: service_healthy
+
+volumes:
+  shared-volume:
