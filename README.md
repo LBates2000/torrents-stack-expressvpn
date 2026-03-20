@@ -34,7 +34,6 @@ EXPRESSVPN_PROTOCOL=auto
 ## First-time setup
 - Install Docker Desktop (or Docker Engine + Compose plugin).
 - Set your ExpressVPN activation code/server/protocol using `.env` values from `.env.example`.
-- Optional: place persistent ExpressVPN state in `./configs/expressvpn/`.
 - Copy `.env.example` to `.env` and adjust values for your host/network.
 - Start the stack with `docker compose up -d`.
 
@@ -87,6 +86,25 @@ docker compose up --force-recreate -d
 - Images default to `latest` in `docker-compose.yml` via environment-backed tags.
 - Override image tags in `.env` using `EXPRESSVPN_IMAGE_TAG`, `FLARESOLVERR_IMAGE_TAG`, `JACKETT_IMAGE_TAG`, and `QBITTORRENT_IMAGE_TAG`.
 
+## Advanced env overrides
+- Network driver: `APP_NET_DRIVER` (default: `bridge`)
+- Container names: `EXPRESSVPN_CONTAINER_NAME`, `FLARESOLVERR_CONTAINER_NAME`, `JACKETT_CONTAINER_NAME`, `QBITTORRENT_CONTAINER_NAME`
+- Shared healthcheck defaults: `HEALTHCHECK_INTERVAL`, `HEALTHCHECK_TIMEOUT`, `HEALTHCHECK_RETRIES`, `HEALTHCHECK_START_PERIOD`
+- If you customize container names, update any external scripts/automation that reference those container names directly.
+
+Example custom overrides:
+```env
+APP_NET_DRIVER=bridge
+EXPRESSVPN_CONTAINER_NAME=vpn-gateway
+FLARESOLVERR_CONTAINER_NAME=flaresolverr-app
+JACKETT_CONTAINER_NAME=jackett-app
+QBITTORRENT_CONTAINER_NAME=qbittorrent-app
+HEALTHCHECK_INTERVAL=30s
+HEALTHCHECK_TIMEOUT=15s
+HEALTHCHECK_RETRIES=10
+HEALTHCHECK_START_PERIOD=45s
+```
+
 ## Startup order
 - `expressvpn` and `flaresolverr` start independently (no dependencies).
 - `jackett` depends on `flaresolverr`.
@@ -108,7 +126,7 @@ docker compose up --force-recreate -d
 | Avg | 73.74 |
 | Max | 77.90 |
 
-- Shared healthcheck cadence: `interval=20s`, `timeout=10s`, `retries=8`, `start_period=30s`.
+- Shared healthcheck cadence defaults: `interval=20s`, `timeout=10s`, `retries=8`, `start_period=30s` (override via `HEALTHCHECK_*` in `.env`).
 - If startup exceeds 2-3 minutes, check logs.
 
 ### Quick diagnostics
