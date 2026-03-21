@@ -19,7 +19,7 @@ body:
         - label: Confirm stack health (`docker compose ps`)
         - label: Review Dependabot PRs and workflow updates
         - label: Review pinned image tags and upstream release notes
-        - label: Validate external access to qBittorrent, Jackett, FlareSolverr
+        - label: Validate ExpressVPN, qBittorrent, Jackett, and FlareSolverr health/access
 
   - type: textarea
     id: notes

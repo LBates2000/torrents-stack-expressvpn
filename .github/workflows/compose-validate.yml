@@ -39,7 +39,7 @@ jobs:
         if: env.EXPRESSVPN_ACTIVATION_CODE != ''
         run: |
           set -euo pipefail
-          services=(flaresolverr jackett qbittorrent)
+          services=(expressvpn flaresolverr jackett qbittorrent)
           timeout_seconds=240
           start_time=$(date +%s)
 

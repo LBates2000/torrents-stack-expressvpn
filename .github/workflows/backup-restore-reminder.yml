@@ -42,7 +42,7 @@ jobs:
               "- [ ] Run config backup command from README",
               "- [ ] Restore to a test location or temporary stack",
               "- [ ] Bring stack up and verify service health",
-              "- [ ] Confirm qBittorrent, Jackett, and FlareSolverr access",
+              "- [ ] Confirm ExpressVPN, qBittorrent, Jackett, and FlareSolverr health/access",
               "- [ ] Document any issues found"
             ].join('\n');
 
