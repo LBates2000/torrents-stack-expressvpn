@@ -226,10 +226,13 @@ try {
         }
 
         'start' {
+            $startTime = [System.Diagnostics.Stopwatch]::StartNew()
             Invoke-ConfigSync
             Write-Host ''
             Write-Host '==> Starting stack...'
             docker compose up -d --wait --wait-timeout 300
+            $startTime.Stop()
+            Write-Host "Stack startup completed in $([math]::Round($startTime.Elapsed.TotalSeconds, 2)) seconds"
         }
 
         'stop' {
@@ -238,6 +241,7 @@ try {
         }
 
         'restart' {
+            $startTime = [System.Diagnostics.Stopwatch]::StartNew()
             Write-Host '==> Stopping stack...'
             docker compose down
             Write-Host ''
@@ -245,9 +249,12 @@ try {
             Write-Host ''
             Write-Host '==> Starting stack...'
             docker compose up -d --wait --wait-timeout 300
+            $startTime.Stop()
+            Write-Host "Stack restart completed in $([math]::Round($startTime.Elapsed.TotalSeconds, 2)) seconds"
         }
 
         'update' {
+            $startTime = [System.Diagnostics.Stopwatch]::StartNew()
             Write-Host '==> Pulling latest images...'
             docker compose pull
             Write-Host ''
@@ -258,6 +265,8 @@ try {
             Write-Host ''
             Write-Host '==> Starting stack...'
             docker compose up -d --wait --wait-timeout 300
+            $startTime.Stop()
+            Write-Host "Stack update completed in $([math]::Round($startTime.Elapsed.TotalSeconds, 2)) seconds"
         }
 
         'status' {
