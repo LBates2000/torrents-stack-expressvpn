@@ -6,22 +6,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Get-EnvMap {
-    param([string]$Path)
-
-    $map = @{}
-    Get-Content -LiteralPath $Path | ForEach-Object {
-        $line = $_.Trim()
-        if ([string]::IsNullOrWhiteSpace($line)) { return }
-        if ($line.StartsWith('#')) { return }
-        $eq = $line.IndexOf('=')
-        if ($eq -lt 1) { return }
-        $key = $line.Substring(0, $eq).Trim()
-        $value = $line.Substring($eq + 1)
-        $map[$key] = $value
-    }
-    return $map
-}
+# Import shared utility functions
+. "$PSScriptRoot/shared-functions.ps1"
 
 function Set-IniSetting {
     param(
@@ -127,6 +113,30 @@ function Try-Get-QbittorrentSaltBytes {
     }
 }
 
+<#
+.SYNOPSIS
+    Generate a qBittorrent-compatible PBKDF2 password hash.
+
+.DESCRIPTION
+    Creates a PBKDF2-SHA512 hash compatible with qBittorrent's QSettings format.
+    Uses 100,000 iterations (qBittorrent standard) and 16-byte random salt if not provided.
+    Reuses existing salt if provided to maintain idempotency across multiple runs.
+
+.PARAMETER PlaintextPassword
+    The plaintext password to hash.
+
+.PARAMETER SaltBytes
+    Optional. 16-byte salt for the PBKDF2 derivation. If not provided or empty,
+    generates a new random salt.
+
+.OUTPUTS
+    [string] in format: @ByteArray(base64(salt):base64(hash))
+
+.NOTES
+    - Hash output is unquoted (important for INI parsing)
+    - Salt reuse means same password → same hash (avoids churn)
+    - Output directly assignable to qBittorrent.conf [Preferences]\WebUI\Password_PBKDF2
+#>
 function New-QbittorrentPasswordHash {
     param(
         [Parameter(Mandatory)]
@@ -134,6 +144,7 @@ function New-QbittorrentPasswordHash {
         [byte[]]$SaltBytes
     )
 
+    # Generate random salt if not provided
     if (-not $SaltBytes -or $SaltBytes.Length -eq 0) {
         $SaltBytes = New-Object byte[] 16
         [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($SaltBytes)
@@ -158,6 +169,29 @@ function New-QbittorrentPasswordHash {
     }
 }
 
+<#
+.SYNOPSIS
+    Parse JSON from environment variable.
+
+.DESCRIPTION
+    Retrieves a JSON-formatted value from environment map and deserializes it.
+    Returns default object if key is missing or empty.
+
+.PARAMETER EnvMap
+    Hashtable of environment variables.
+
+.PARAMETER Key
+    Environment variable name to parse.
+
+.PARAMETER DefaultObject
+    Default object to return if key not found or empty.
+
+.OUTPUTS
+    [object] Deserialized JSON or default object.
+
+.EXAMPLE
+    $categories = Get-JsonFromEnv -EnvMap $envMap -Key 'QBITTORRENT_CFG_CATEGORIES_JSON' -DefaultObject @{ movies = '/downloads/movies' }
+#>
 function Get-JsonFromEnv {
     param(
         [hashtable]$EnvMap,
@@ -233,20 +267,6 @@ function Ensure-File {
     if (-not (Test-Path -LiteralPath $Path)) {
         [System.IO.File]::WriteAllText($Path, $DefaultContent)
     }
-}
-
-function Get-EnvOrDefault {
-    param(
-        [hashtable]$EnvMap,
-        [string]$Key,
-        [string]$DefaultValue
-    )
-
-    if ($EnvMap.ContainsKey($Key)) {
-        return $EnvMap[$Key]
-    }
-
-    return $DefaultValue
 }
 
 $repoRoot = Split-Path -Parent $PSScriptRoot

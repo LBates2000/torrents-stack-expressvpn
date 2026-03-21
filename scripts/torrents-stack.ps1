@@ -51,10 +51,22 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# Import shared utility functions
+. "$PSScriptRoot/shared-functions.ps1"
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Push-Location $repoRoot
 
 try {
+    <#
+    .SYNOPSIS
+        Sync configuration from .env to all service config files.
+
+    .DESCRIPTION
+        Invokes sync scripts for Jackett and qBittorrent in sequence.
+        Each sync script applies config changes and optionally restarts
+        the service if changes were detected.
+    #>
     function Invoke-ConfigSync {
         Write-Host '==> Syncing configs from .env...'
         pwsh -NoProfile -File "$PSScriptRoot/sync-jackett-config.ps1" -SkipRestart
@@ -62,42 +74,31 @@ try {
         pwsh -NoProfile -File "$PSScriptRoot/sync-qbittorrent-config.ps1" -SkipRestart
     }
 
-    function Get-EnvMap {
-        param([string]$Path)
+    <#
+    .SYNOPSIS
+        Test qBittorrent WebUI login.
 
-        $map = @{}
-        if (-not (Test-Path -LiteralPath $Path)) {
-            return $map
-        }
+    .DESCRIPTION
+        Makes an HTTP POST request to qBittorrent's auth endpoint with the provided
+        credentials. Returns a structured result with success status and diagnostic info.
 
-        Get-Content -LiteralPath $Path | ForEach-Object {
-            $line = $_.Trim()
-            if ([string]::IsNullOrWhiteSpace($line)) { return }
-            if ($line.StartsWith('#')) { return }
-            $eq = $line.IndexOf('=')
-            if ($eq -lt 1) { return }
-            $key = $line.Substring(0, $eq).Trim()
-            $value = $line.Substring($eq + 1)
-            $map[$key] = $value
-        }
+    .PARAMETER BaseUrl
+        Base URL of qBittorrent WebUI (e.g., http://localhost:8080)
 
-        return $map
-    }
+    .PARAMETER Username
+        qBittorrent WebUI username (typically 'admin')
 
-    function Get-EnvOrDefault {
-        param(
-            [hashtable]$Map,
-            [string]$Key,
-            [string]$DefaultValue
-        )
+    .PARAMETER Password
+        qBittorrent WebUI password
 
-        if ($Map.ContainsKey($Key)) {
-            return [string]$Map[$Key]
-        }
-
-        return $DefaultValue
-    }
-
+    .OUTPUTS
+        [pscustomobject] with properties:
+          - Ok: $true if login succeeded, $false otherwise
+          - Message: Human-readable result message
+          - Endpoint: Target API endpoint used
+          - StatusCode: HTTP status code (-1 if exception)
+          - Body: Response body or error message
+    #>
     function Test-QbittorrentLogin {
         param(
             [string]$BaseUrl,
@@ -105,10 +106,7 @@ try {
             [string]$Password
         )
 
-        $handler = [System.Net.Http.HttpClientHandler]::new()
-        $client = [System.Net.Http.HttpClient]::new($handler)
-        $client.Timeout = [TimeSpan]::FromSeconds(12)
-
+        $client = New-HttpClient
         try {
             $escapedUser = [uri]::EscapeDataString($Username)
             $escapedPass = [uri]::EscapeDataString($Password)
@@ -148,20 +146,39 @@ try {
         }
         finally {
             $client.Dispose()
-            $handler.Dispose()
         }
     }
 
+    <#
+    .SYNOPSIS
+        Test Jackett API key validity.
+
+    .DESCRIPTION
+        Makes an HTTP GET request to Jackett's indexer endpoint with the API key.
+        Validates both connectivity and authentication. Returns structured result
+        with diagnostic information.
+
+    .PARAMETER BaseUrl
+        Base URL of Jackett service (e.g., http://localhost:9117)
+
+    .PARAMETER ApiKey
+        Jackett API key
+
+    .OUTPUTS
+        [pscustomobject] with properties:
+          - Ok: $true if API key is valid, $false otherwise
+          - Message: Human-readable result message
+          - Endpoint: Target API endpoint (with key masked as ***)
+          - StatusCode: HTTP status code (-1 if exception)
+          - Body: Response body excerpt or error message
+    #>
     function Test-JackettApiKey {
         param(
             [string]$BaseUrl,
             [string]$ApiKey
         )
 
-        $handler = [System.Net.Http.HttpClientHandler]::new()
-        $client = [System.Net.Http.HttpClient]::new($handler)
-        $client.Timeout = [TimeSpan]::FromSeconds(12)
-
+        $client = New-HttpClient
         try {
             $escapedApiKey = [uri]::EscapeDataString($ApiKey)
             $url = "$BaseUrl/api/v2.0/indexers/all/results?apikey=$escapedApiKey&Query=ubuntu"
@@ -199,7 +216,6 @@ try {
         }
         finally {
             $client.Dispose()
-            $handler.Dispose()
         }
     }
 
@@ -272,10 +288,10 @@ try {
             $envMap = Get-EnvMap -Path $envPath
 
             if ($runningServices -contains 'qbittorrent') {
-                $qbitPort = Get-EnvOrDefault -Map $envMap -Key 'QBITTORRENT_WEBUI_PORT' -DefaultValue '8080'
+                $qbitPort = Get-EnvOrDefault -EnvMap $envMap -Key 'QBITTORRENT_WEBUI_PORT' -DefaultValue '8080'
                 $qbitBaseUrl = "http://localhost:$qbitPort"
                 $qbitUser = 'admin'
-                $qbitPassword = Get-EnvOrDefault -Map $envMap -Key 'QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT' -DefaultValue ''
+                $qbitPassword = Get-EnvOrDefault -EnvMap $envMap -Key 'QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT' -DefaultValue ''
 
                 if ([string]::IsNullOrWhiteSpace($qbitPassword)) {
                     Write-Host 'qBittorrent login check skipped: QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT is not set'
@@ -306,10 +322,10 @@ try {
             }
 
             if ($runningServices -contains 'jackett') {
-                $jackettPort = Get-EnvOrDefault -Map $envMap -Key 'JACKETT_PORT' -DefaultValue '9117'
+                $jackettPort = Get-EnvOrDefault -EnvMap $envMap -Key 'JACKETT_PORT' -DefaultValue '9117'
                 $jackettBaseUrl = "http://localhost:$jackettPort"
 
-                $jackettApiKey = Get-EnvOrDefault -Map $envMap -Key 'JACKETT_CFG_API_KEY' -DefaultValue ''
+                $jackettApiKey = Get-EnvOrDefault -EnvMap $envMap -Key 'JACKETT_CFG_API_KEY' -DefaultValue ''
                 $jackettApiKeySource = '.env (JACKETT_CFG_API_KEY)'
                 if ([string]::IsNullOrWhiteSpace($jackettApiKey) -or ($jackettApiKey -eq 'null')) {
                     $jackettConfigPath = Join-Path $repoRoot 'configs/Jackett/ServerConfig.json'
