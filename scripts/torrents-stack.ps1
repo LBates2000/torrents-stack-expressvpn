@@ -359,6 +359,20 @@ try {
             else {
                 Write-Host 'Jackett auth check skipped: service is not running'
             }
+
+            Write-Host ''
+            Write-Host '==> Web UIs'
+
+            $qbittorrentUrl = "$qbitBaseUrl/"
+            $jackettUrl = "http://localhost:$jackettPort/"
+            $flaresolverrUrl = 'http://localhost:8191/'
+
+            Write-Host "qBittorrent   : $qbittorrentUrl"
+            Write-Host "Jackett       : $jackettUrl"
+            Write-Host "Flaresolverr  : $flaresolverrUrl"
+
+            Write-Host ''
+            Write-Host '💡 Tip: Click on the URLs above in your terminal to open them in your browser'
         }
 
         'logs' {

@@ -137,6 +137,7 @@ docker compose up --force-recreate -d
 - Run `pwsh ./scripts/sync-qbittorrent-config.ps1` to sync config from `.env`.
 - The script restarts `qbittorrent` only when `qBittorrent.conf`, `categories.json`, or `watched_folders.json` changed and the service is running.
 - Use `pwsh ./scripts/sync-qbittorrent-config.ps1 -SkipRestart` to sync without restart.
+- Use `pwsh ./scripts/sync-qbittorrent-config.ps1 -Verbose` to show password generation and config update details.
 - If `QBITTORRENT_CFG_WEBUI_PASSWORD_PBKDF2` is empty or missing, the script leaves any existing `WebUI\Password_PBKDF2` value unchanged.
 - If `QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT` is set, the script generates a PBKDF2-SHA512 (100000 iterations) hash in qBittorrent format.
 
@@ -179,7 +180,9 @@ HEALTHCHECK_START_PERIOD=45s
 
 ### Quick diagnostics
 - Overall status: `pwsh ./scripts/torrents-stack.ps1 status`
+  - Shows container status and clickable web UI links for qBittorrent, Jackett, and Flaresolverr
 - Auth diagnostics (verbose): `pwsh ./scripts/torrents-stack.ps1 status -VerboseAuth`
+  - Includes authentication check details and endpoint information
 - `status` now also reports whether qBittorrent has Jackett plugin files at `configs/qBittorrent/nova3/engines/jackett.py` and `jackett.json`.
 - Health-focused status: `docker compose ps --format "table {{.Name}}\t{{.State}}\t{{.Health}}\t{{.Status}}"`
 - Timed startup (PowerShell): `$t = Measure-Command { docker compose up -d }; $t.TotalSeconds`

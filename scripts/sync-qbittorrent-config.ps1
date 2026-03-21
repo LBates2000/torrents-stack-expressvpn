@@ -1,5 +1,6 @@
 param(
-    [switch]$SkipRestart
+    [switch]$SkipRestart,
+    [switch]$Verbose
 )
 
 Set-StrictMode -Version Latest
@@ -372,14 +373,22 @@ foreach ($m in $mappings) {
 
 $webUiPasswordHashValue = Get-EnvOrDefault -EnvMap $envMap -Key 'QBITTORRENT_CFG_WEBUI_PASSWORD_PBKDF2' -DefaultValue ''
 $webUiPasswordPlaintext = Get-EnvOrDefault -EnvMap $envMap -Key 'QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT' -DefaultValue ''
+$passwordGeneratedFromPlaintext = $false
 
 if ([string]::IsNullOrWhiteSpace($webUiPasswordHashValue) -and -not [string]::IsNullOrWhiteSpace($webUiPasswordPlaintext)) {
+    if ($Verbose) { Write-Host 'Generating qBittorrent password hash from plaintext...' }
     $existingPasswordValue = Get-IniSetting -Lines $lineList -Section 'Preferences' -Key 'WebUI\Password_PBKDF2'
     $existingSaltBytes = Try-Get-QbittorrentSaltBytes -ExistingValue $existingPasswordValue
     $webUiPasswordHashValue = New-QbittorrentPasswordHash -PlaintextPassword $webUiPasswordPlaintext -SaltBytes $existingSaltBytes
+    $passwordGeneratedFromPlaintext = $true
+    if ($Verbose) { Write-Host 'Password hash generated successfully' }
 }
 
 if (-not [string]::IsNullOrWhiteSpace($webUiPasswordHashValue)) {
+    $currentPasswordValue = Get-IniSetting -Lines $lineList -Section 'Preferences' -Key 'WebUI\Password_PBKDF2'
+    if ($currentPasswordValue -ne $webUiPasswordHashValue) {
+        if ($Verbose) { Write-Host 'qBittorrent WebUI password is being updated in config' }
+    }
     Set-IniSetting -Lines $lineList -Section 'Preferences' -Key 'WebUI\Password_PBKDF2' -Value $webUiPasswordHashValue
 }
 
@@ -462,9 +471,15 @@ if (-not $anyChanges) {
 }
 elseif ($SkipRestart) {
     Write-Host 'Updated qBittorrent config from .env (restart skipped)'
+    if ($passwordGeneratedFromPlaintext) {
+        Write-Host 'qBittorrent WebUI password was generated from QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT'
+    }
 }
 elseif ($anyChanges) {
     Write-Host 'Updated qBittorrent config from .env'
+    if ($passwordGeneratedFromPlaintext) {
+        Write-Host 'qBittorrent WebUI password was generated from QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT'
+    }
 }
 
 Write-Host "qBittorrent.conf changed: $hasChanges"
