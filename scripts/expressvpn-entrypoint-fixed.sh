@@ -19,6 +19,7 @@ expressvpnctl set networklock false
 
 token_file=/tmp/evpn_login_token.txt
 printf '%s\n' "$ACTIVATION_CODE" > "$token_file"
+unset ACTIVATION_CODE
 chmod 600 "$token_file"
 
 cleanup_token_file() {
