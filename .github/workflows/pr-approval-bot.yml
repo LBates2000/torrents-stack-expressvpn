@@ -1,0 +1,29 @@
+name: PR Approval Bot
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+  workflow_dispatch:
+
+permissions:
+  pull-requests: write
+
+jobs:
+  auto-approve:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.pull_request.draft == false &&
+        github.event.pull_request.head.repo.fork == false &&
+        contains(fromJSON('["dependabot[bot]","LBates2000","lbates2000-pr-approver-bot"]'), github.event.pull_request.user.login)
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto-approve trusted PR
+        uses: hmarr/auto-approve-action@v4
+        with:
+          github-token: ${{ secrets.PR_APPROVAL_BOT_TOKEN }}

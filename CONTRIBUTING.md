@@ -11,6 +11,14 @@ Thanks for contributing to this project.
   - `docker compose ps`
 - Open a pull request and complete the template.
 
+## PR approval bot
+- Workflow file: `.github/workflows/pr-approval-bot.yml`.
+- Create a repository secret named `PR_APPROVAL_BOT_TOKEN`.
+- Recommended token: Fine-grained PAT from a dedicated bot account with repository `Pull requests: Read and write`.
+- Current trusted PR authors are `dependabot[bot]` and `LBates2000`.
+- To change trusted authors, edit the JSON list in the workflow `contains(fromJSON(...), github.event.pull_request.user.login)` condition.
+- Important: this bot adds an approval review, but branch protection still requires a code-owner review from `.github/CODEOWNERS`.
+
 ## Configuration changes
 - Do not commit runtime data from `configs/` or `downloads/`.
 - Do not commit real credentials, API keys, or VPN private keys.
