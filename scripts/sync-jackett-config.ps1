@@ -204,9 +204,9 @@ elseif ($SkipRestart) {
 elseif ($hasChanges) {
     Write-Host 'Updated Jackett ServerConfig from .env'
 }
-Write-Host "APIKey=$($config['APIKey'])"
-Write-Host "InstanceId=$($config['InstanceId'])"
+Write-Host 'APIKey=<redacted>'
+Write-Host 'InstanceId=<redacted>'
 Write-Host "BlackholeDir=$($config['BlackholeDir'])"
-Write-Host "OmdbApiKey=$($config['OmdbApiKey'])"
+Write-Host 'OmdbApiKey=<redacted>'
 Write-Host "OmdbApiUrl=$($config['OmdbApiUrl'])"
 Write-Host "FlareSolverrUrl=$($config['FlareSolverrUrl'])"

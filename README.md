@@ -14,6 +14,7 @@ This stack routes only qBittorrent through ExpressVPN.
 - Keep real secrets only in local `.env`; do not commit them to git.
 - `.env` is intentionally ignored by `.gitignore`; `.env.example` is the safe template to commit.
 - Sensitive values in this stack include `EXPRESSVPN_ACTIVATION_CODE`, `JACKETT_CFG_API_KEY`, and `JACKETT_CFG_OMDB_API_KEY`.
+- Sync and runtime scripts intentionally redact sensitive values in console logs (for example API keys and auth tokens).
 - Enable the local pre-commit guardrail once per clone: `git config core.hooksPath .githooks`.
 - The repo includes `.githooks/pre-commit` to block commits that stage `.env`.
 - CI also enforces this with `.github/workflows/prevent-env-tracking.yml`.
