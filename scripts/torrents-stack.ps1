@@ -295,10 +295,16 @@ try {
 
             $envPath = Join-Path $repoRoot '.env'
             $envMap = Get-EnvMap -Path $envPath
+            $flaresolverrPort = Get-EnvOrDefault -EnvMap $envMap -Key 'FLARESOLVERR_PORT' -DefaultValue '8191'
+            $jackettPort = Get-EnvOrDefault -EnvMap $envMap -Key 'JACKETT_PORT' -DefaultValue '9117'
+            $qbitPort = Get-EnvOrDefault -EnvMap $envMap -Key 'QBITTORRENT_WEBUI_PORT' -DefaultValue '8080'
+            $flaresolverrUrl = "http://localhost:$flaresolverrPort/"
+            $jackettUrl = "http://localhost:$jackettPort/"
+            $qbittorrentUrl = "http://localhost:$qbitPort/"
+            $qbitBaseUrl = "http://localhost:$qbitPort"
+            $jackettBaseUrl = "http://localhost:$jackettPort"
 
             if ($runningServices -contains 'qbittorrent') {
-                $qbitPort = Get-EnvOrDefault -EnvMap $envMap -Key 'QBITTORRENT_WEBUI_PORT' -DefaultValue '8080'
-                $qbitBaseUrl = "http://localhost:$qbitPort"
                 $qbitUser = 'admin'
                 $qbitPassword = Get-EnvOrDefault -EnvMap $envMap -Key 'QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT' -DefaultValue ''
 
@@ -331,9 +337,6 @@ try {
             }
 
             if ($runningServices -contains 'jackett') {
-                $jackettPort = Get-EnvOrDefault -EnvMap $envMap -Key 'JACKETT_PORT' -DefaultValue '9117'
-                $jackettBaseUrl = "http://localhost:$jackettPort"
-
                 $jackettApiKey = Get-EnvOrDefault -EnvMap $envMap -Key 'JACKETT_CFG_API_KEY' -DefaultValue ''
                 $jackettApiKeySource = '.env (JACKETT_CFG_API_KEY)'
                 if ([string]::IsNullOrWhiteSpace($jackettApiKey) -or ($jackettApiKey -eq 'null')) {
@@ -388,13 +391,9 @@ try {
             Write-Host ''
             Write-Host '==> Web UIs'
 
-            $qbittorrentUrl = "$qbitBaseUrl/"
-            $jackettUrl = "http://localhost:$jackettPort/"
-            $flaresolverrUrl = 'http://localhost:8191/'
-
-            Write-Host "qBittorrent   : $qbittorrentUrl"
-            Write-Host "Jackett       : $jackettUrl"
             Write-Host "Flaresolverr  : $flaresolverrUrl"
+            Write-Host "Jackett       : $jackettUrl"
+            Write-Host "qBittorrent   : $qbittorrentUrl"
 
             Write-Host ''
             Write-Host '💡 Tip: Click on the URLs above in your terminal to open them in your browser'
