@@ -125,6 +125,10 @@ docker compose up --force-recreate -d
 - Use `.env` values (`QBITTORRENT_CFG_*`) to manage `configs/qBittorrent/qBittorrent.conf`.
 - Use `QBITTORRENT_CFG_CATEGORIES_JSON` to populate `configs/qBittorrent/categories.json`.
 - Use `QBITTORRENT_CFG_WATCHED_FOLDERS_JSON` to populate `configs/qBittorrent/watched_folders.json`.
+- On startup, `qbittorrent` bootstraps the Jackett search plugin under `configs/qBittorrent/nova3/engines`:
+	- Installs `jackett.py` automatically (if missing) from `QBITTORRENT_JACKETT_PLUGIN_URL`.
+	- Writes `jackett.json` using `QBITTORRENT_JACKETT_API_KEY` (or auto-reads `configs/Jackett/ServerConfig.json` `APIKey` when empty).
+	- Defaults plugin URL target to `QBITTORRENT_JACKETT_URL=http://jackett:9117`.
 - If either JSON env var is empty, the script auto-generates defaults from `QBITTORRENT_CFG_DOWNLOADS_SAVE_PATH`:
   - Categories: `movies -> <SavePath>/movies`, `tv -> <SavePath>/tv`
   - Watched folders: `<SavePath>/watch/movies` and `<SavePath>/watch/tv`
@@ -171,6 +175,7 @@ HEALTHCHECK_START_PERIOD=45s
 
 ### Quick diagnostics
 - Overall status: `pwsh ./scripts/torrents-stack.ps1 status`
+- `status` now also reports whether qBittorrent has Jackett plugin files at `configs/qBittorrent/nova3/engines/jackett.py` and `jackett.json`.
 - Health-focused status: `docker compose ps --format "table {{.Name}}\t{{.State}}\t{{.Health}}\t{{.Status}}"`
 - Timed startup (PowerShell): `$t = Measure-Command { docker compose up -d }; $t.TotalSeconds`
 - Tail all logs: `pwsh ./scripts/torrents-stack.ps1 logs`
