@@ -1,26 +1,13 @@
 param(
-    [switch]$SkipRestart
+    [switch]$SkipRestart,
+    [switch]$Verbose
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Get-EnvMap {
-    param([string]$Path)
-
-    $map = @{}
-    Get-Content -LiteralPath $Path | ForEach-Object {
-        $line = $_.Trim()
-        if ([string]::IsNullOrWhiteSpace($line)) { return }
-        if ($line.StartsWith('#')) { return }
-        $eq = $line.IndexOf('=')
-        if ($eq -lt 1) { return }
-        $key = $line.Substring(0, $eq).Trim()
-        $value = $line.Substring($eq + 1)
-        $map[$key] = $value
-    }
-    return $map
-}
+# Import shared utility functions
+. "$PSScriptRoot/shared-functions.ps1"
 
 function Set-IniSetting {
     param(
@@ -67,6 +54,144 @@ function Set-IniSetting {
     $Lines.Insert($sectionEnd, "$Key=$Value")
 }
 
+function Get-IniSetting {
+    param(
+        [System.Collections.Generic.List[string]]$Lines,
+        [string]$Section,
+        [string]$Key
+    )
+
+    $sectionHeader = "[$Section]"
+    $sectionStart = -1
+    for ($i = 0; $i -lt $Lines.Count; $i++) {
+        if ($Lines[$i] -eq $sectionHeader) {
+            $sectionStart = $i
+            break
+        }
+    }
+
+    if ($sectionStart -lt 0) {
+        return $null
+    }
+
+    $sectionEnd = $Lines.Count
+    for ($i = $sectionStart + 1; $i -lt $Lines.Count; $i++) {
+        if ($Lines[$i] -match '^\[') {
+            $sectionEnd = $i
+            break
+        }
+    }
+
+    $prefix = "$Key="
+    for ($i = $sectionStart + 1; $i -lt $sectionEnd; $i++) {
+        if ($Lines[$i].StartsWith($prefix)) {
+            return $Lines[$i].Substring($prefix.Length)
+        }
+    }
+
+    return $null
+}
+
+function Try-Get-QbittorrentSaltBytes {
+    param([string]$ExistingValue)
+
+    if ([string]::IsNullOrWhiteSpace($ExistingValue)) {
+        return $null
+    }
+
+    $trimmed = $ExistingValue.Trim().Trim('"')
+    $match = [regex]::Match($trimmed, '^@ByteArray\(([^:]+):([^\)]+)\)$')
+    if (-not $match.Success) {
+        return $null
+    }
+
+    try {
+        return [Convert]::FromBase64String($match.Groups[1].Value)
+    }
+    catch {
+        return $null
+    }
+}
+
+<#
+.SYNOPSIS
+    Generate a qBittorrent-compatible PBKDF2 password hash.
+
+.DESCRIPTION
+    Creates a PBKDF2-SHA512 hash compatible with qBittorrent's QSettings format.
+    Uses 100,000 iterations (qBittorrent standard) and 16-byte random salt if not provided.
+    Reuses existing salt if provided to maintain idempotency across multiple runs.
+
+.PARAMETER PlaintextPassword
+    The plaintext password to hash.
+
+.PARAMETER SaltBytes
+    Optional. 16-byte salt for the PBKDF2 derivation. If not provided or empty,
+    generates a new random salt.
+
+.OUTPUTS
+    [string] in format: @ByteArray(base64(salt):base64(hash))
+
+.NOTES
+    - Hash output is unquoted (important for INI parsing)
+    - Salt reuse means same password → same hash (avoids churn)
+    - Output directly assignable to qBittorrent.conf [Preferences]\WebUI\Password_PBKDF2
+#>
+function New-QbittorrentPasswordHash {
+    param(
+        [Parameter(Mandatory)]
+        [string]$PlaintextPassword,
+        [byte[]]$SaltBytes
+    )
+
+    # Generate random salt if not provided
+    if (-not $SaltBytes -or $SaltBytes.Length -eq 0) {
+        $SaltBytes = New-Object byte[] 16
+        [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($SaltBytes)
+    }
+
+    $passwordBytes = [System.Text.Encoding]::UTF8.GetBytes($PlaintextPassword)
+    $pbkdf2 = [System.Security.Cryptography.Rfc2898DeriveBytes]::new(
+        $passwordBytes,
+        $SaltBytes,
+        100000,
+        [System.Security.Cryptography.HashAlgorithmName]::SHA512
+    )
+
+    try {
+        $derivedBytes = $pbkdf2.GetBytes(64)
+        $saltB64 = [Convert]::ToBase64String($SaltBytes)
+        $hashB64 = [Convert]::ToBase64String($derivedBytes)
+        return '@ByteArray({0}:{1})' -f $saltB64, $hashB64
+    }
+    finally {
+        $pbkdf2.Dispose()
+    }
+}
+
+<#
+.SYNOPSIS
+    Parse JSON from environment variable.
+
+.DESCRIPTION
+    Retrieves a JSON-formatted value from environment map and deserializes it.
+    Returns default object if key is missing or empty.
+
+.PARAMETER EnvMap
+    Hashtable of environment variables.
+
+.PARAMETER Key
+    Environment variable name to parse.
+
+.PARAMETER DefaultObject
+    Default object to return if key not found or empty.
+
+.OUTPUTS
+    [object] Deserialized JSON or default object.
+
+.EXAMPLE
+    $categories = Get-JsonFromEnv -EnvMap $envMap -Key 'QBITTORRENT_CFG_CATEGORIES_JSON' -DefaultObject @{ movies = '/downloads/movies' }
+#>
 function Get-JsonFromEnv {
     param(
         [hashtable]$EnvMap,
@@ -144,20 +269,6 @@ function Ensure-File {
     }
 }
 
-function Get-EnvOrDefault {
-    param(
-        [hashtable]$EnvMap,
-        [string]$Key,
-        [string]$DefaultValue
-    )
-
-    if ($EnvMap.ContainsKey($Key)) {
-        return $EnvMap[$Key]
-    }
-
-    return $DefaultValue
-}
-
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $envPath = Join-Path $repoRoot '.env'
 
@@ -197,7 +308,8 @@ $mappings = @(
     @{ Section = 'Preferences'; Key = 'Downloads\SavePath'; Env = 'QBITTORRENT_CFG_DOWNLOADS_SAVE_PATH'; Default = '/downloads/' },
     @{ Section = 'Preferences'; Key = 'Downloads\TempPath'; Env = 'QBITTORRENT_CFG_DOWNLOADS_TEMP_PATH'; Default = '/downloads/incomplete/' },
     @{ Section = 'Preferences'; Key = 'WebUI\Address'; Env = 'QBITTORRENT_CFG_WEBUI_ADDRESS'; Default = '*' },
-    @{ Section = 'Preferences'; Key = 'WebUI\ServerDomains'; Env = 'QBITTORRENT_CFG_WEBUI_SERVER_DOMAINS'; Default = '*' }
+    @{ Section = 'Preferences'; Key = 'WebUI\ServerDomains'; Env = 'QBITTORRENT_CFG_WEBUI_SERVER_DOMAINS'; Default = '*' },
+    @{ Section = 'Preferences'; Key = 'WebUI\Password_PBKDF2'; Env = 'QBITTORRENT_CFG_WEBUI_PASSWORD_PBKDF2'; Default = ''; Optional = $true }
 )
 
 $downloadsBase = Normalize-PathPrefix -PathValue ($envMap['QBITTORRENT_CFG_DOWNLOADS_SAVE_PATH'])
@@ -223,6 +335,17 @@ $defaultWatchedFoldersObject = [ordered]@{
 
 $seedLines = [System.Collections.Generic.List[string]]::new()
 foreach ($mapping in $mappings) {
+    $isOptional = $false
+    if ($mapping.ContainsKey('Optional')) {
+        $isOptional = [bool]$mapping.Optional
+    }
+
+    if ($isOptional) {
+        if (-not $envMap.ContainsKey($mapping.Env) -or [string]::IsNullOrWhiteSpace($envMap[$mapping.Env])) {
+            continue
+        }
+    }
+
     $seedValue = Get-EnvOrDefault -EnvMap $envMap -Key $mapping.Env -DefaultValue $mapping.Default
     Set-IniSetting -Lines $seedLines -Section $mapping.Section -Key $mapping.Key -Value $seedValue
 }
@@ -253,8 +376,40 @@ foreach ($line in $originalLines) {
 }
 
 foreach ($m in $mappings) {
+    $isOptional = $false
+    if ($m.ContainsKey('Optional')) {
+        $isOptional = [bool]$m.Optional
+    }
+
+    if ($isOptional) {
+        if (-not $envMap.ContainsKey($m.Env) -or [string]::IsNullOrWhiteSpace($envMap[$m.Env])) {
+            continue
+        }
+    }
+
     $value = Get-EnvOrDefault -EnvMap $envMap -Key $m.Env -DefaultValue $m.Default
     Set-IniSetting -Lines $lineList -Section $m.Section -Key $m.Key -Value $value
+}
+
+$webUiPasswordHashValue = Get-EnvOrDefault -EnvMap $envMap -Key 'QBITTORRENT_CFG_WEBUI_PASSWORD_PBKDF2' -DefaultValue ''
+$webUiPasswordPlaintext = Get-EnvOrDefault -EnvMap $envMap -Key 'QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT' -DefaultValue ''
+$passwordGeneratedFromPlaintext = $false
+
+if ([string]::IsNullOrWhiteSpace($webUiPasswordHashValue) -and -not [string]::IsNullOrWhiteSpace($webUiPasswordPlaintext)) {
+    if ($Verbose) { Write-Host 'Generating qBittorrent password hash from plaintext...' }
+    $existingPasswordValue = Get-IniSetting -Lines $lineList -Section 'Preferences' -Key 'WebUI\Password_PBKDF2'
+    $existingSaltBytes = Try-Get-QbittorrentSaltBytes -ExistingValue $existingPasswordValue
+    $webUiPasswordHashValue = New-QbittorrentPasswordHash -PlaintextPassword $webUiPasswordPlaintext -SaltBytes $existingSaltBytes
+    $passwordGeneratedFromPlaintext = $true
+    if ($Verbose) { Write-Host 'Password hash generated successfully' }
+}
+
+if (-not [string]::IsNullOrWhiteSpace($webUiPasswordHashValue)) {
+    $currentPasswordValue = Get-IniSetting -Lines $lineList -Section 'Preferences' -Key 'WebUI\Password_PBKDF2'
+    if ($currentPasswordValue -ne $webUiPasswordHashValue) {
+        if ($Verbose) { Write-Host 'qBittorrent WebUI password is being updated in config' }
+    }
+    Set-IniSetting -Lines $lineList -Section 'Preferences' -Key 'WebUI\Password_PBKDF2' -Value $webUiPasswordHashValue
 }
 
 $updatedLines = $lineList.ToArray()
@@ -268,6 +423,24 @@ else {
             $hasChanges = $true
             break
         }
+    }
+}
+
+$qbittorrentWasRunningBeforeChanges = $false
+$qbittorrentWasStoppedForConfigWrite = $false
+if (-not $SkipRestart) {
+    Push-Location $repoRoot
+    try {
+        $runningServices = @(docker compose ps --status running --services)
+        $qbittorrentWasRunningBeforeChanges = $runningServices -contains 'qbittorrent'
+
+        if ($qbittorrentWasRunningBeforeChanges -and $hasChanges) {
+            docker compose stop qbittorrent | Out-Host
+            $qbittorrentWasStoppedForConfigWrite = $true
+        }
+    }
+    finally {
+        Pop-Location
     }
 }
 
@@ -294,20 +467,22 @@ if ($watchedFoldersChanged) {
 $anyChanges = $hasChanges -or $categoriesChanged -or $watchedFoldersChanged
 
 if ($anyChanges -and -not $SkipRestart) {
-    Push-Location $repoRoot
-    try {
-        $runningServices = @(docker compose ps --status running --services)
-        if ($runningServices -contains 'qbittorrent') {
-            docker compose stop qbittorrent | Out-Host
+    if ($qbittorrentWasRunningBeforeChanges) {
+        Push-Location $repoRoot
+        try {
+            if (-not $qbittorrentWasStoppedForConfigWrite) {
+                docker compose stop qbittorrent | Out-Host
+            }
+
             docker compose start qbittorrent | Out-Host
             Write-Host 'Restarted qbittorrent to apply config changes'
         }
-        else {
-            Write-Host 'Config updated; qbittorrent not running, so restart was not needed'
+        finally {
+            Pop-Location
         }
     }
-    finally {
-        Pop-Location
+    else {
+        Write-Host 'Config updated; qbittorrent not running, so restart was not needed'
     }
 }
 
@@ -316,9 +491,15 @@ if (-not $anyChanges) {
 }
 elseif ($SkipRestart) {
     Write-Host 'Updated qBittorrent config from .env (restart skipped)'
+    if ($passwordGeneratedFromPlaintext) {
+        Write-Host 'qBittorrent WebUI password was generated from QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT'
+    }
 }
 elseif ($anyChanges) {
     Write-Host 'Updated qBittorrent config from .env'
+    if ($passwordGeneratedFromPlaintext) {
+        Write-Host 'qBittorrent WebUI password was generated from QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT'
+    }
 }
 
 Write-Host "qBittorrent.conf changed: $hasChanges"

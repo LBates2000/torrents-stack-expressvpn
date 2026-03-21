@@ -5,23 +5,23 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Get-EnvMap {
-    param([string]$Path)
+# Import shared utility functions
+. "$PSScriptRoot/shared-functions.ps1"
 
-    $map = @{}
-    Get-Content -LiteralPath $Path | ForEach-Object {
-        $line = $_.Trim()
-        if ([string]::IsNullOrWhiteSpace($line)) { return }
-        if ($line.StartsWith('#')) { return }
-        $eq = $line.IndexOf('=')
-        if ($eq -lt 1) { return }
-        $key = $line.Substring(0, $eq).Trim()
-        $value = $line.Substring($eq + 1).Trim()
-        $map[$key] = $value
-    }
-    return $map
-}
+<#
+.SYNOPSIS
+    Convert null or empty tokens to $null.
 
+.DESCRIPTION
+    Normalizes string representations of null or empty values. Used for configuration
+    values that should be unset/empty in Jackett config.
+
+.PARAMETER Value
+    Input string to convert.
+
+.OUTPUTS
+    [string] or [null]
+#>
 function Convert-NullToken {
     param([string]$Value)
     if ($null -eq $Value) { return $null }
@@ -70,20 +70,23 @@ function Ensure-Directory {
     }
 }
 
-function Get-EnvOrDefault {
-    param(
-        [hashtable]$EnvMap,
-        [string]$Key,
-        [string]$DefaultValue
-    )
+<#
+.SYNOPSIS
+    Convert and validate configuration values.
 
-    if ($EnvMap.ContainsKey($Key)) {
-        return $EnvMap[$Key]
-    }
+.DESCRIPTION
+    Converts string values from .env to the appropriate type (string, int, bool)
+    while handling null/empty tokens consistently.
 
-    return $DefaultValue
-}
+.PARAMETER Value
+    Raw environment variable value.
 
+.PARAMETER Kind
+    Target type: 'string', 'int', or 'bool'
+
+.OUTPUTS
+    Converted value in the requested type, or $null if value represents null.
+#>
 function Convert-EnvValue {
     param(
         [string]$Value,
@@ -201,9 +204,9 @@ elseif ($SkipRestart) {
 elseif ($hasChanges) {
     Write-Host 'Updated Jackett ServerConfig from .env'
 }
-Write-Host "APIKey=$($config['APIKey'])"
-Write-Host "InstanceId=$($config['InstanceId'])"
+Write-Host 'APIKey=<redacted>'
+Write-Host 'InstanceId=<redacted>'
 Write-Host "BlackholeDir=$($config['BlackholeDir'])"
-Write-Host "OmdbApiKey=$($config['OmdbApiKey'])"
+Write-Host 'OmdbApiKey=<redacted>'
 Write-Host "OmdbApiUrl=$($config['OmdbApiUrl'])"
 Write-Host "FlareSolverrUrl=$($config['FlareSolverrUrl'])"

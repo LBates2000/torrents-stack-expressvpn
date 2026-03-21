@@ -14,6 +14,7 @@ This stack routes only qBittorrent through ExpressVPN.
 - Keep real secrets only in local `.env`; do not commit them to git.
 - `.env` is intentionally ignored by `.gitignore`; `.env.example` is the safe template to commit.
 - Sensitive values in this stack include `EXPRESSVPN_ACTIVATION_CODE`, `JACKETT_CFG_API_KEY`, and `JACKETT_CFG_OMDB_API_KEY`.
+- Sync and runtime scripts intentionally redact sensitive values in console logs (for example API keys and auth tokens).
 - Enable the local pre-commit guardrail once per clone: `git config core.hooksPath .githooks`.
 - The repo includes `.githooks/pre-commit` to block commits that stage `.env`.
 - CI also enforces this with `.github/workflows/prevent-env-tracking.yml`.
@@ -123,14 +124,23 @@ docker compose up --force-recreate -d
 
 ### qBittorrent config via env
 - Use `.env` values (`QBITTORRENT_CFG_*`) to manage `configs/qBittorrent/qBittorrent.conf`.
+- Optional: set `QBITTORRENT_CFG_WEBUI_PASSWORD_PBKDF2` to enforce the WebUI admin password hash via `.env`.
+- Optional: set `QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT` to generate `WebUI\Password_PBKDF2` automatically during sync (PBKDF2 value wins if both are set).
 - Use `QBITTORRENT_CFG_CATEGORIES_JSON` to populate `configs/qBittorrent/categories.json`.
 - Use `QBITTORRENT_CFG_WATCHED_FOLDERS_JSON` to populate `configs/qBittorrent/watched_folders.json`.
+- On startup, `qbittorrent` bootstraps the Jackett search plugin under `configs/qBittorrent/nova3/engines`:
+	- Installs `jackett.py` automatically (if missing) from `QBITTORRENT_JACKETT_PLUGIN_URL`.
+	- Writes `jackett.json` using `QBITTORRENT_JACKETT_API_KEY` (or auto-reads `configs/Jackett/ServerConfig.json` `APIKey` when empty).
+	- Defaults plugin URL target to `QBITTORRENT_JACKETT_URL=http://jackett:9117`.
 - If either JSON env var is empty, the script auto-generates defaults from `QBITTORRENT_CFG_DOWNLOADS_SAVE_PATH`:
   - Categories: `movies -> <SavePath>/movies`, `tv -> <SavePath>/tv`
   - Watched folders: `<SavePath>/watch/movies` and `<SavePath>/watch/tv`
 - Run `pwsh ./scripts/sync-qbittorrent-config.ps1` to sync config from `.env`.
 - The script restarts `qbittorrent` only when `qBittorrent.conf`, `categories.json`, or `watched_folders.json` changed and the service is running.
 - Use `pwsh ./scripts/sync-qbittorrent-config.ps1 -SkipRestart` to sync without restart.
+- Use `pwsh ./scripts/sync-qbittorrent-config.ps1 -Verbose` to show password generation and config update details.
+- If `QBITTORRENT_CFG_WEBUI_PASSWORD_PBKDF2` is empty or missing, the script leaves any existing `WebUI\Password_PBKDF2` value unchanged.
+- If `QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT` is set, the script generates a PBKDF2-SHA512 (100000 iterations) hash in qBittorrent format.
 
 Example custom overrides:
 ```env
@@ -171,6 +181,10 @@ HEALTHCHECK_START_PERIOD=45s
 
 ### Quick diagnostics
 - Overall status: `pwsh ./scripts/torrents-stack.ps1 status`
+  - Shows container status and clickable web UI links for qBittorrent, Jackett, and Flaresolverr
+- Auth diagnostics (verbose): `pwsh ./scripts/torrents-stack.ps1 status -VerboseAuth`
+  - Includes authentication check details and endpoint information
+- `status` now also reports whether qBittorrent has Jackett plugin files at `configs/qBittorrent/nova3/engines/jackett.py` and `jackett.json`.
 - Health-focused status: `docker compose ps --format "table {{.Name}}\t{{.State}}\t{{.Health}}\t{{.Status}}"`
 - Timed startup (PowerShell): `$t = Measure-Command { docker compose up -d }; $t.TotalSeconds`
 - Tail all logs: `pwsh ./scripts/torrents-stack.ps1 logs`

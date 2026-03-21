@@ -19,6 +19,13 @@ expressvpnctl set networklock false
 
 token_file=/tmp/evpn_login_token.txt
 printf '%s\n' "$ACTIVATION_CODE" > "$token_file"
+unset ACTIVATION_CODE
+chmod 600 "$token_file"
+
+cleanup_token_file() {
+  rm -f "$token_file"
+}
+trap cleanup_token_file EXIT
 
 login_with_retries() {
   local attempt=1
@@ -30,7 +37,7 @@ login_with_retries() {
     set -e
 
     if [ -n "$login_output" ]; then
-      echo "$login_output"
+      echo "[entrypoint] Login command returned output (redacted)."
     fi
 
     if [ "$login_status" -eq 0 ]; then
@@ -43,7 +50,7 @@ login_with_retries() {
       return 0
     fi
 
-    echo "[entrypoint] Login attempt ${attempt} failed; retrying in ${delay}s..."
+    echo "[entrypoint] Login attempt ${attempt} failed (details redacted); retrying in ${delay}s..."
     sleep "$delay"
     attempt=$((attempt + 1))
   done

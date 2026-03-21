@@ -13,18 +13,39 @@ x-common-volumes: &common-volumes
     - ${HOST_CONFIGS_DIR:-./configs}:${CONTAINER_CONFIGS_DIR:-/config}
     - ${HOST_DOWNLOADS_DIR:-./downloads}:${CONTAINER_DOWNLOADS_DIR:-/downloads}
 
+x-common-app-environment: &common-app-environment
+  TZ: ${TZ:-Etc/UTC}
+
+x-linuxserver-environment: &linuxserver-environment
+  PUID: ${PUID:-1000}
+  PGID: ${PGID:-1000}
+  TZ: ${TZ:-Etc/UTC}
+
 x-qbittorrent-command: &qbittorrent-command
   command: >-
     /bin/bash -c "sleep 20 &&
-    cp /shared_data/resolv.conf /etc/resolv.conf &&
+    { echo 'nameserver 127.0.0.11'; grep -v '^nameserver 127.0.0.11$' /shared_data/resolv.conf; } > /etc/resolv.conf &&
     mkdir -p ${CONTAINER_DOWNLOADS_DIR:-/downloads}/watch ${CONTAINER_DOWNLOADS_DIR:-/downloads}/watch/movies ${CONTAINER_DOWNLOADS_DIR:-/downloads}/watch/tv &&
-    bash"
+    bash /tmp/bootstrap-qbittorrent-jackett.sh || true &&
+    sleep infinity"
 
 x-health: &common-health
   interval: ${HEALTHCHECK_INTERVAL:-20s}
   timeout: ${HEALTHCHECK_TIMEOUT:-10s}
-  retries: ${HEALTHCHECK_RETRIES:-8}
-  start_period: ${HEALTHCHECK_START_PERIOD:-30s}
+  retries: ${HEALTHCHECK_RETRIES:-5}
+  start_period: ${HEALTHCHECK_START_PERIOD:-45s}
+
+x-flaresolverr-healthcheck-test: &flaresolverr-healthcheck-test
+  ["CMD", "bash", "-c", "curl -sf http://localhost:8191 | grep -q '\"msg\".*\"FlareSolverr is ready!\"'"]
+
+x-jackett-healthcheck-test: &jackett-healthcheck-test
+  ["CMD", "bash", "-c", "curl -s -o /dev/null -w '%{http_code}' http://localhost:9117/ --max-time 10 | grep -qE '^(200|301|302)$'"]
+
+x-qbittorrent-healthcheck-test: &qbittorrent-healthcheck-test
+  ["CMD", "bash", "-c", "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/ --max-time 10 | grep -qE '^(200|302)$'"]
+
+x-depends-on-healthy: &depends-on-healthy
+  condition: service_healthy
 
 networks:
   app_net:
@@ -75,14 +96,14 @@ services:
     ports:
       - "${FLARESOLVERR_PORT:-8191}:8191"
     environment:
-      - LOG_LEVEL=${LOG_LEVEL:-info}
-      - LOG_FILE=${LOG_FILE:-none}
-      - LOG_HTML=${LOG_HTML:-false}
-      - CAPTCHA_SOLVER=${CAPTCHA_SOLVER:-none}
-      - TZ=${TZ:-Etc/UTC}
+      <<: *common-app-environment
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FILE: ${LOG_FILE:-none}
+      LOG_HTML: ${LOG_HTML:-false}
+      CAPTCHA_SOLVER: ${CAPTCHA_SOLVER:-none}
     healthcheck:
       <<: *common-health
-      test: ["CMD", "bash", "-c", "curl -sf http://localhost:8191 | grep -q '\"msg\".*\"FlareSolverr is ready!\"'"]
+      test: *flaresolverr-healthcheck-test
     networks:
       - app_net
 
@@ -93,42 +114,39 @@ services:
     ports:
       - "${JACKETT_PORT:-9117}:9117"
     environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-Etc/UTC}
-      - AUTO_UPDATE=${JACKETT_AUTO_UPDATE:-true}
-      - RUN_OPTS=${JACKETT_RUN_OPTS:-}
-      - JACKETT_CFG_PORT=${JACKETT_CFG_PORT:-9117}
-      - JACKETT_CFG_LOCAL_BIND_ADDRESS=${JACKETT_CFG_LOCAL_BIND_ADDRESS:-127.0.0.1}
-      - JACKETT_CFG_ALLOW_EXTERNAL=${JACKETT_CFG_ALLOW_EXTERNAL:-true}
-      - JACKETT_CFG_ALLOW_CORS=${JACKETT_CFG_ALLOW_CORS:-false}
-      - JACKETT_CFG_API_KEY=${JACKETT_CFG_API_KEY:-null}
-      - JACKETT_CFG_ADMIN_PASSWORD=${JACKETT_CFG_ADMIN_PASSWORD:-null}
-      - JACKETT_CFG_INSTANCE_ID=${JACKETT_CFG_INSTANCE_ID:-null}
-      - JACKETT_CFG_BLACKHOLE_DIR=${JACKETT_CFG_BLACKHOLE_DIR:-${CONTAINER_DOWNLOADS_DIR:-/downloads}/watch}
-      - JACKETT_CFG_UPDATE_DISABLED=${JACKETT_CFG_UPDATE_DISABLED:-false}
-      - JACKETT_CFG_UPDATE_PRERELEASE=${JACKETT_CFG_UPDATE_PRERELEASE:-false}
-      - JACKETT_CFG_BASE_PATH_OVERRIDE=${JACKETT_CFG_BASE_PATH_OVERRIDE:-null}
-      - JACKETT_CFG_BASE_URL_OVERRIDE=${JACKETT_CFG_BASE_URL_OVERRIDE:-null}
-      - JACKETT_CFG_CACHE_ENABLED=${JACKETT_CFG_CACHE_ENABLED:-true}
-      - JACKETT_CFG_CACHE_TTL=${JACKETT_CFG_CACHE_TTL:-2100}
-      - JACKETT_CFG_CACHE_MAX_RESULTS_PER_INDEXER=${JACKETT_CFG_CACHE_MAX_RESULTS_PER_INDEXER:-1000}
-      - JACKETT_CFG_FLARESOLVERR_URL=${JACKETT_CFG_FLARESOLVERR_URL:-http://flaresolverr:8191}
-      - JACKETT_CFG_FLARESOLVERR_MAX_TIMEOUT=${JACKETT_CFG_FLARESOLVERR_MAX_TIMEOUT:-55000}
-      - JACKETT_CFG_OMDB_API_KEY=${JACKETT_CFG_OMDB_API_KEY:-null}
-      - JACKETT_CFG_OMDB_API_URL=${JACKETT_CFG_OMDB_API_URL:-https://www.omdbapi.com/}
-      - JACKETT_CFG_PROXY_TYPE=${JACKETT_CFG_PROXY_TYPE:-0}
-      - JACKETT_CFG_PROXY_URL=${JACKETT_CFG_PROXY_URL:-null}
-      - JACKETT_CFG_PROXY_PORT=${JACKETT_CFG_PROXY_PORT:-null}
-      - JACKETT_CFG_PROXY_USERNAME=${JACKETT_CFG_PROXY_USERNAME:-null}
-      - JACKETT_CFG_PROXY_PASSWORD=${JACKETT_CFG_PROXY_PASSWORD:-null}
-      - JACKETT_CFG_PROXY_IS_ANONYMOUS=${JACKETT_CFG_PROXY_IS_ANONYMOUS:-true}
+      <<: *linuxserver-environment
+      AUTO_UPDATE: ${JACKETT_AUTO_UPDATE:-true}
+      RUN_OPTS: ${JACKETT_RUN_OPTS:-}
+      JACKETT_CFG_PORT: ${JACKETT_CFG_PORT:-9117}
+      JACKETT_CFG_LOCAL_BIND_ADDRESS: ${JACKETT_CFG_LOCAL_BIND_ADDRESS:-127.0.0.1}
+      JACKETT_CFG_ALLOW_EXTERNAL: ${JACKETT_CFG_ALLOW_EXTERNAL:-true}
+      JACKETT_CFG_ALLOW_CORS: ${JACKETT_CFG_ALLOW_CORS:-false}
+      JACKETT_CFG_API_KEY: ${JACKETT_CFG_API_KEY:-null}
+      JACKETT_CFG_ADMIN_PASSWORD: ${JACKETT_CFG_ADMIN_PASSWORD:-null}
+      JACKETT_CFG_INSTANCE_ID: ${JACKETT_CFG_INSTANCE_ID:-null}
+      JACKETT_CFG_BLACKHOLE_DIR: ${JACKETT_CFG_BLACKHOLE_DIR:-${CONTAINER_DOWNLOADS_DIR:-/downloads}/watch}
+      JACKETT_CFG_UPDATE_DISABLED: ${JACKETT_CFG_UPDATE_DISABLED:-false}
+      JACKETT_CFG_UPDATE_PRERELEASE: ${JACKETT_CFG_UPDATE_PRERELEASE:-false}
+      JACKETT_CFG_BASE_PATH_OVERRIDE: ${JACKETT_CFG_BASE_PATH_OVERRIDE:-null}
+      JACKETT_CFG_BASE_URL_OVERRIDE: ${JACKETT_CFG_BASE_URL_OVERRIDE:-null}
+      JACKETT_CFG_CACHE_ENABLED: ${JACKETT_CFG_CACHE_ENABLED:-true}
+      JACKETT_CFG_CACHE_TTL: ${JACKETT_CFG_CACHE_TTL:-2100}
+      JACKETT_CFG_CACHE_MAX_RESULTS_PER_INDEXER: ${JACKETT_CFG_CACHE_MAX_RESULTS_PER_INDEXER:-1000}
+      JACKETT_CFG_FLARESOLVERR_URL: ${JACKETT_CFG_FLARESOLVERR_URL:-http://flaresolverr:8191}
+      JACKETT_CFG_FLARESOLVERR_MAX_TIMEOUT: ${JACKETT_CFG_FLARESOLVERR_MAX_TIMEOUT:-55000}
+      JACKETT_CFG_OMDB_API_KEY: ${JACKETT_CFG_OMDB_API_KEY:-null}
+      JACKETT_CFG_OMDB_API_URL: ${JACKETT_CFG_OMDB_API_URL:-https://www.omdbapi.com/}
+      JACKETT_CFG_PROXY_TYPE: ${JACKETT_CFG_PROXY_TYPE:-0}
+      JACKETT_CFG_PROXY_URL: ${JACKETT_CFG_PROXY_URL:-null}
+      JACKETT_CFG_PROXY_PORT: ${JACKETT_CFG_PROXY_PORT:-null}
+      JACKETT_CFG_PROXY_USERNAME: ${JACKETT_CFG_PROXY_USERNAME:-null}
+      JACKETT_CFG_PROXY_PASSWORD: ${JACKETT_CFG_PROXY_PASSWORD:-null}
+      JACKETT_CFG_PROXY_IS_ANONYMOUS: ${JACKETT_CFG_PROXY_IS_ANONYMOUS:-true}
     healthcheck:
       <<: *common-health
-      test: ["CMD", "bash", "-c", "curl -s -o /dev/null -w '%{http_code}' http://localhost:9117/ --max-time 10 | grep -qE '^(200|301|302)$'"]
+      test: *jackett-healthcheck-test
     depends_on:
-      flaresolverr:
-        condition: service_healthy
+      flaresolverr: *depends-on-healthy
     networks:
       - app_net
 
@@ -138,25 +156,26 @@ services:
     container_name: ${QBITTORRENT_CONTAINER_NAME:-qbittorrent}
     network_mode: "service:expressvpn"
     environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-Etc/UTC}
-      - WEBUI_PORT=${QBITTORRENT_WEBUI_PORT:-8080}
-      - TORRENTING_PORT=${QBITTORRENT_TORRENTING_PORT:-6881}
+      <<: *linuxserver-environment
+      WEBUI_PORT: ${QBITTORRENT_WEBUI_PORT:-8080}
+      TORRENTING_PORT: ${QBITTORRENT_TORRENTING_PORT:-6881}
+      QBITTORRENT_JACKETT_API_KEY: ${QBITTORRENT_JACKETT_API_KEY:-}
+      QBITTORRENT_JACKETT_URL: ${QBITTORRENT_JACKETT_URL:-http://jackett:9117}
+      QBITTORRENT_JACKETT_THREAD_COUNT: ${QBITTORRENT_JACKETT_THREAD_COUNT:-20}
+      QBITTORRENT_JACKETT_TRACKER_FIRST: ${QBITTORRENT_JACKETT_TRACKER_FIRST:-false}
+      QBITTORRENT_JACKETT_PLUGIN_URL: ${QBITTORRENT_JACKETT_PLUGIN_URL:-https://raw.githubusercontent.com/qbittorrent/search-plugins/fa0be6abdc47b8622e8ec71a0d4427d9a7770eab/nova3/engines/jackett.py}
     volumes:
       - ${HOST_CONFIGS_DIR:-./configs}:${CONTAINER_CONFIGS_DIR:-/config}
       - ${HOST_DOWNLOADS_DIR:-./downloads}:${CONTAINER_DOWNLOADS_DIR:-/downloads}
       - shared-volume:/shared_data
+      - ./scripts/bootstrap-qbittorrent-jackett.sh:/tmp/bootstrap-qbittorrent-jackett.sh:ro
     healthcheck:
       <<: *common-health
-      test: ["CMD", "bash", "-c", "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/ --max-time 10 | grep -qE '^(200|302)$'"]
+      test: *qbittorrent-healthcheck-test
     depends_on:
-      expressvpn:
-        condition: service_healthy
-      jackett:
-        condition: service_healthy
-      flaresolverr:
-        condition: service_healthy
+      expressvpn: *depends-on-healthy
+      jackett: *depends-on-healthy
+      flaresolverr: *depends-on-healthy
 
 volumes:
   shared-volume:
