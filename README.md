@@ -5,10 +5,33 @@
 
 This stack routes only qBittorrent through ExpressVPN.
 
-## Wrapper script
-- Primary entrypoint: `pwsh ./scripts/torrents-stack.ps1 <command>`
-- Common commands: `start`, `stop`, `restart`, `update`, `status`, `logs`, `sync`
-- Example: `pwsh ./scripts/torrents-stack.ps1 start`
+
+## Stack Commands (Wrapper Script)
+
+**Primary entrypoint:**
+```
+pwsh ./scripts/torrents-stack.ps1 <command>
+```
+
+
+
+**Available commands:**
+
+- `start`     — Sync configs then bring the stack up (detached)
+- `stop`      — Stop and remove containers (volumes are preserved)
+- `restart`   — Stop then start
+- `update`    — Pull latest images then restart
+- `status`    — Show running container status
+- `logs`      — Tail logs for all services (or a specific service)
+- `sync`      — Sync config files from .env without touching containers
+- `rebuild`   — Rebuild the stack from scratch (all containers and images are removed)
+- `clean`     — Stop and remove all containers, volumes, and prune all unused Docker resources (does not rebuild or start the stack)
+- `test-all`  — Run all stack commands in logical order, checking status and health at each step, and report final success or failure
+
+**Example:**
+```
+pwsh ./scripts/torrents-stack.ps1 start
+```
 
 ## Secrets handling
 - Keep real secrets only in local `.env`; do not commit them to git.
@@ -35,14 +58,28 @@ This stack routes only qBittorrent through ExpressVPN.
 ## ExpressVPN prerequisites
 - Active ExpressVPN subscription and activation code.
 - Docker host that supports `NET_ADMIN` and `/dev/net/tun` for VPN tunneling.
-- Set `EXPRESSVPN_ACTIVATION_CODE` in `.env` before first startup.
-- `EXPRESSVPN_REGION`: set a valid region alias, e.g. `uk-docklands`.
-- `EXPRESSVPN_PROTOCOL`: use `auto` (recommended) or set `lightwayudp`, `lightwaytcp`, `openvpnudp`, `openvpntcp`, or `wireguard`.
+
+Set `EXPRESSVPN_ACTIVATION_CODE` in `.env` before first startup.
+
+`EXPRESSVPN_REGION`: set a valid region code from the following list:
+
+* netherlands-amsterdam
+* netherlands-rotterdam
+* netherlands-the-hague
+* switzerland
+* switzerland-2
+
+To list all valid region codes, run `expressvpnctl get regions` inside the running expressvpn container:
+```sh
+docker exec -it expressvpn expressvpnctl get regions
+```
+The classic `expressvpn list all` command is not available in this image.
+`EXPRESSVPN_PROTOCOL`: use `auto` (recommended) or set `lightwayudp`, `lightwaytcp`, `openvpnudp`, `openvpntcp`, or `wireguard`.
 
 Example `.env` values:
 ```env
 EXPRESSVPN_ACTIVATION_CODE=YOUR_CODE_HERE
-EXPRESSVPN_REGION=uk-docklands
+EXPRESSVPN_REGION=netherlands-amsterdam
 EXPRESSVPN_PROTOCOL=auto
 ```
 
@@ -232,6 +269,7 @@ docker compose ps --format "table {{.Name}}\t{{.State}}\t{{.Health}}\t{{.Status}
 
 ## Notes
 - If you change ExpressVPN activation/region/protocol values, restart the `expressvpn` container.
+- To troubleshoot region issues, use `docker exec -it expressvpn expressvpnctl get regions` to see all valid region codes.
 - Keep `expressvpn` service running before app services start.
 - Redirect-based healthchecks are intentional: `301`/`302` can still mean the web UI is up before login.
 

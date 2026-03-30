@@ -212,62 +212,6 @@ function Get-JsonFromEnv {
     }
 }
 
-function Normalize-PathPrefix {
-    param([string]$PathValue)
-
-    if ([string]::IsNullOrWhiteSpace($PathValue)) {
-        return '/downloads'
-    }
-
-    $trimmed = $PathValue.Trim()
-    while ($trimmed.Length -gt 1 -and $trimmed.EndsWith('/')) {
-        $trimmed = $trimmed.Substring(0, $trimmed.Length - 1)
-    }
-    return $trimmed
-}
-
-function Resolve-HostPath {
-    param(
-        [string]$RepoRoot,
-        [string]$ConfiguredPath,
-        [string]$DefaultRelativePath
-    )
-
-    $pathValue = $ConfiguredPath
-    if ([string]::IsNullOrWhiteSpace($pathValue)) {
-        $pathValue = $DefaultRelativePath
-    }
-
-    if ([System.IO.Path]::IsPathRooted($pathValue)) {
-        return [System.IO.Path]::GetFullPath($pathValue)
-    }
-
-    return [System.IO.Path]::GetFullPath((Join-Path $RepoRoot $pathValue))
-}
-
-function Ensure-Directory {
-    param([string]$Path)
-
-    if (-not (Test-Path -LiteralPath $Path)) {
-        New-Item -ItemType Directory -Path $Path -Force | Out-Null
-    }
-}
-
-function Ensure-File {
-    param(
-        [string]$Path,
-        [string]$DefaultContent = ''
-    )
-
-    $parentPath = Split-Path -Parent $Path
-    if (-not [string]::IsNullOrWhiteSpace($parentPath)) {
-        Ensure-Directory -Path $parentPath
-    }
-
-    if (-not (Test-Path -LiteralPath $Path)) {
-        [System.IO.File]::WriteAllText($Path, $DefaultContent)
-    }
-}
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $envPath = Join-Path $repoRoot '.env'
@@ -309,10 +253,11 @@ $mappings = @(
     @{ Section = 'Preferences'; Key = 'Downloads\TempPath'; Env = 'QBITTORRENT_CFG_DOWNLOADS_TEMP_PATH'; Default = '/downloads/incomplete/' },
     @{ Section = 'Preferences'; Key = 'WebUI\Address'; Env = 'QBITTORRENT_CFG_WEBUI_ADDRESS'; Default = '*' },
     @{ Section = 'Preferences'; Key = 'WebUI\ServerDomains'; Env = 'QBITTORRENT_CFG_WEBUI_SERVER_DOMAINS'; Default = '*' },
-    @{ Section = 'Preferences'; Key = 'WebUI\Password_PBKDF2'; Env = 'QBITTORRENT_CFG_WEBUI_PASSWORD_PBKDF2'; Default = ''; Optional = $true }
+    @{ Section = 'Preferences'; Key = 'WebUI\Password_PBKDF2'; Env = 'QBITTORRENT_CFG_WEBUI_PASSWORD_PBKDF2'; Default = ''; Optional = $true },
+    @{ Section = 'Preferences'; Key = 'QBITTORRENT_JACKETT_API_KEY'; Env = 'QBITTORRENT_JACKETT_API_KEY'; Default = ''; Optional = $true }
 )
 
-$downloadsBase = Normalize-PathPrefix -PathValue ($envMap['QBITTORRENT_CFG_DOWNLOADS_SAVE_PATH'])
+$downloadsBase = Convert-PathPrefix -PathValue ($envMap['QBITTORRENT_CFG_DOWNLOADS_SAVE_PATH'])
 $watchBase = "$downloadsBase/watch"
 
 $defaultCategoriesObject = [ordered]@{
@@ -354,20 +299,20 @@ $seedConfigContent = ([string]::Join([Environment]::NewLine, $seedLines.ToArray(
 $seedCategoriesContent = ($defaultCategoriesObject | ConvertTo-Json -Depth 20) + [Environment]::NewLine
 $seedWatchedFoldersContent = ($defaultWatchedFoldersObject | ConvertTo-Json -Depth 20) + [Environment]::NewLine
 
-Ensure-Directory -Path $qbittorrentConfigDir
-Ensure-Directory -Path (Join-Path $qbittorrentConfigDir 'logs')
-Ensure-Directory -Path (Join-Path $qbittorrentConfigDir 'BT_backup')
-Ensure-Directory -Path (Join-Path $qbittorrentConfigDir 'rss')
-Ensure-Directory -Path (Join-Path $qbittorrentConfigDir 'rss/articles')
-Ensure-Directory -Path (Join-Path $qbittorrentConfigDir 'GeoDB')
-Ensure-Directory -Path $downloadsRoot
-Ensure-Directory -Path (Join-Path $downloadsRoot 'watch')
-Ensure-Directory -Path (Join-Path $downloadsRoot 'watch/movies')
-Ensure-Directory -Path (Join-Path $downloadsRoot 'watch/tv')
-Ensure-Directory -Path (Join-Path $downloadsRoot 'incomplete')
-Ensure-File -Path $configPath -DefaultContent $seedConfigContent
-Ensure-File -Path $categoriesPath -DefaultContent $seedCategoriesContent
-Ensure-File -Path $watchedFoldersPath -DefaultContent $seedWatchedFoldersContent
+New-DirectoryIfMissing -Path $qbittorrentConfigDir
+New-DirectoryIfMissing -Path (Join-Path $qbittorrentConfigDir 'logs')
+New-DirectoryIfMissing -Path (Join-Path $qbittorrentConfigDir 'BT_backup')
+New-DirectoryIfMissing -Path (Join-Path $qbittorrentConfigDir 'rss')
+New-DirectoryIfMissing -Path (Join-Path $qbittorrentConfigDir 'rss/articles')
+New-DirectoryIfMissing -Path (Join-Path $qbittorrentConfigDir 'GeoDB')
+New-DirectoryIfMissing -Path $downloadsRoot
+New-DirectoryIfMissing -Path (Join-Path $downloadsRoot 'watch')
+New-DirectoryIfMissing -Path (Join-Path $downloadsRoot 'watch/movies')
+New-DirectoryIfMissing -Path (Join-Path $downloadsRoot 'watch/tv')
+New-DirectoryIfMissing -Path (Join-Path $downloadsRoot 'incomplete')
+New-FileIfMissing -Path $configPath -DefaultContent $seedConfigContent
+New-FileIfMissing -Path $categoriesPath -DefaultContent $seedCategoriesContent
+New-FileIfMissing -Path $watchedFoldersPath -DefaultContent $seedWatchedFoldersContent
 
 $originalLines = @(Get-Content -LiteralPath $configPath)
 $lineList = [System.Collections.Generic.List[string]]::new()

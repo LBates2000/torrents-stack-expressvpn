@@ -119,3 +119,137 @@ function New-HttpClient {
     $client.Timeout = [TimeSpan]::FromSeconds($TimeoutSeconds)
     return $client
 }
+
+# --- Path and Directory Utilities (shared) ---
+function Convert-PathPrefix {
+    param([string]$PathValue)
+    if ([string]::IsNullOrWhiteSpace($PathValue)) {
+        return '/downloads'
+    }
+    $trimmed = $PathValue.Trim()
+    while ($trimmed.Length -gt 1 -and $trimmed.EndsWith('/')) {
+        $trimmed = $trimmed.Substring(0, $trimmed.Length - 1)
+    }
+    return $trimmed
+}
+
+function Resolve-HostPath {
+    param(
+        [string]$RepoRoot,
+        [string]$ConfiguredPath,
+        [string]$DefaultRelativePath
+    )
+    $pathValue = $ConfiguredPath
+    if ([string]::IsNullOrWhiteSpace($pathValue)) {
+        $pathValue = $DefaultRelativePath
+    }
+    if ([System.IO.Path]::IsPathRooted($pathValue)) {
+        return [System.IO.Path]::GetFullPath($pathValue)
+    }
+    return [System.IO.Path]::GetFullPath((Join-Path $RepoRoot $pathValue))
+}
+
+function New-DirectoryIfMissing {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) {
+        New-Item -ItemType Directory -Path $Path -Force | Out-Null
+    }
+}
+
+function New-FileIfMissing {
+    param(
+        [string]$Path,
+        [string]$DefaultContent = ''
+    )
+    $parentPath = Split-Path -Parent $Path
+    if (-not [string]::IsNullOrWhiteSpace($parentPath)) {
+        New-DirectoryIfMissing -Path $parentPath
+    }
+    if (-not (Test-Path -LiteralPath $Path)) {
+        [System.IO.File]::WriteAllText($Path, $DefaultContent)
+    }
+}
+
+# --- qBittorrent Login Check (shared) ---
+function Test-QbittorrentLogin {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$BaseUrl,
+        [Parameter(Mandatory=$true)]
+        [string]$Username,
+        [Parameter(Mandatory=$true)]
+        [Object]$Auth
+    )
+    $client = New-HttpClient
+    try {
+        $securePassword = $null
+        if ($Auth -is [System.Management.Automation.PSCredential]) {
+            $securePassword = $Auth.GetNetworkCredential().Password | ConvertTo-SecureString -AsPlainText -Force
+        } elseif ($Auth -is [System.Security.SecureString]) {
+            $securePassword = $Auth
+        } else {
+            throw "Auth parameter must be a SecureString or PSCredential."
+        }
+        $plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword))
+        $escapedUser = [uri]::EscapeDataString($Username)
+        $escapedPass = [uri]::EscapeDataString($plainPassword)
+        $payload = "username=$escapedUser&password=$escapedPass"
+        $content = [System.Net.Http.StringContent]::new($payload, [System.Text.Encoding]::UTF8, 'application/x-www-form-urlencoded')
+        $response = $client.PostAsync("$BaseUrl/api/v2/auth/login", $content).GetAwaiter().GetResult()
+        $body = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+        $bodyTrim = $body.Trim()
+        $endpoint = "$BaseUrl/api/v2/auth/login"
+        if ($response.IsSuccessStatusCode -and ($bodyTrim -eq 'Ok.')) {
+            return [pscustomobject]@{
+                Ok        = $true
+                Message   = 'qBittorrent login check passed'
+                Endpoint  = $endpoint
+                StatusCode= [int]$response.StatusCode
+                Body      = $bodyTrim
+            }
+        }
+        return [pscustomobject]@{
+            Ok        = $false
+            Message   = "qBittorrent login check failed (status=$([int]$response.StatusCode), body=$bodyTrim)"
+            Endpoint  = $endpoint
+            StatusCode= [int]$response.StatusCode
+            Body      = $bodyTrim
+        }
+    }
+    catch {
+        return [pscustomobject]@{
+            Ok        = $false
+            Message   = "qBittorrent login check failed: $($_.Exception.Message)"
+            Endpoint  = "$BaseUrl/api/v2/auth/login"
+            StatusCode= -1
+            Body      = ''
+        }
+    }
+    finally {
+        $client.Dispose()
+    }
+}
+
+<#+
+.SYNOPSIS
+    Checks for the presence of Jackett plugin files in the qBittorrent container.
+.DESCRIPTION
+    Verifies that both jackett.py and jackett.json exist in /config/qBittorrent/nova3/engines inside the qbittorrent container.
+    Prints status and returns $true if present, $false otherwise.
+#>
+function Test-QbittorrentJackettPlugin {
+    $runningServices = @(docker compose ps --services --filter status=running)
+    if ($runningServices -notcontains 'qbittorrent') {
+        Write-Host 'qBittorrent is not running; plugin check skipped.'
+        return $null
+    }
+    $pluginCheck = docker compose exec -T qbittorrent sh -lc "if [ -s /config/qBittorrent/nova3/engines/jackett.py ] && [ -s /config/qBittorrent/nova3/engines/jackett.json ]; then echo OK; else echo MISSING; fi"
+    if ($pluginCheck -contains 'OK') {
+        Write-Host 'Jackett plugin files present: /config/qBittorrent/nova3/engines/jackett.py and jackett.json'
+        return $true
+    } else {
+        Write-Warning 'Jackett plugin files missing in qBittorrent container (/config/qBittorrent/nova3/engines).'
+        Write-Host 'Run: pwsh ./scripts/torrents-stack.ps1 restart'
+        return $false
+    }
+}

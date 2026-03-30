@@ -1,4 +1,12 @@
+
 #!/usr/bin/bash
+
+# Allowed ExpressVPN regions:
+#   netherlands-amsterdam
+#   netherlands-rotterdam
+#   netherlands-the-hague
+#   switzerland
+#   switzerland-2
 
 set -euo pipefail
 
