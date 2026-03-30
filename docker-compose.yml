@@ -30,10 +30,11 @@ x-qbittorrent-command: &qbittorrent-command
     sleep infinity"
 
 x-health: &common-health
-  interval: ${HEALTHCHECK_INTERVAL:-20s}
-  timeout: ${HEALTHCHECK_TIMEOUT:-10s}
-  retries: ${HEALTHCHECK_RETRIES:-5}
-  start_period: ${HEALTHCHECK_START_PERIOD:-45s}
+  # Tuned for faster feedback (all services healthy <2m)
+  interval: ${HEALTHCHECK_INTERVAL:-30s}
+  timeout: ${HEALTHCHECK_TIMEOUT:-30s}
+  retries: ${HEALTHCHECK_RETRIES:-10}
+  start_period: ${HEALTHCHECK_START_PERIOD:-180s}  # 3 minutes
 
 x-flaresolverr-healthcheck-test: &flaresolverr-healthcheck-test
   ["CMD", "bash", "-c", "curl -sf http://localhost:8191 | grep -q '\"msg\".*\"FlareSolverr is ready!\"'"]
@@ -50,6 +51,8 @@ x-depends-on-healthy: &depends-on-healthy
 networks:
   app_net:
     driver: ${APP_NET_DRIVER:-bridge}
+    labels:
+      - com.torrents-stack.project=expressvpn-stack
 
 services:
   # expressvpn and flaresolverr start independently.
@@ -68,8 +71,9 @@ services:
     stdin_open: true
     tty: true
     privileged: true
+    # Pass the ExpressVPN activation code from .env (required for login)
     environment:
-      - ACTIVATION_CODE=${EXPRESSVPN_ACTIVATION_CODE:-}
+      - ACTIVATION_CODE=${EXPRESSVPN_ACTIVATION_CODE:-} # Set this in your .env file
       - REGION=${EXPRESSVPN_REGION:-uk-docklands}
       - SERVER=${EXPRESSVPN_REGION:-uk-docklands}
       - PROTOCOL=${EXPRESSVPN_PROTOCOL:-auto}
@@ -77,17 +81,20 @@ services:
     entrypoint: /bin/bash /tmp/entrypoint.sh
     command: /bin/bash -c "cp /etc/resolv.conf /shared_data/resolv.conf; while true; do sleep 30; done"
     volumes:
+      - ./scripts:/scripts:ro
       - shared-volume:/shared_data
       - ${HOST_EXPRESSVPN_ENTRYPOINT_SCRIPT:-./scripts/expressvpn-entrypoint-fixed.sh}:/tmp/entrypoint.sh:ro
     healthcheck:
       <<: *common-health
-      test: ["CMD-SHELL", "if [ \"$$EXPRESSVPN_HEALTHCHECK_MODE\" = \"relaxed\" ]; then exit 0; fi; if [ -z \"$$ACTIVATION_CODE\" ]; then exit 0; fi; grep -q '^ *tun0:' /proc/net/dev"]
+      test: ["CMD", "bash", "/scripts/expressvpn-healthcheck.sh"]
     ports:
       - "${QBITTORRENT_WEBUI_PORT:-8080}:${QBITTORRENT_WEBUI_PORT:-8080}"
       - "${QBITTORRENT_TORRENTING_PORT:-6881}:6881"
       - "${QBITTORRENT_TORRENTING_PORT:-6881}:6881/udp"
     networks:
       - app_net
+    labels:
+      - com.torrents-stack.project=expressvpn-stack
 
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:${FLARESOLVERR_IMAGE_TAG:-latest}
@@ -101,15 +108,22 @@ services:
       LOG_FILE: ${LOG_FILE:-none}
       LOG_HTML: ${LOG_HTML:-false}
       CAPTCHA_SOLVER: ${CAPTCHA_SOLVER:-none}
+    volumes:
+      - ./scripts:/scripts:ro
     healthcheck:
       <<: *common-health
-      test: *flaresolverr-healthcheck-test
+      test:
+        - "CMD"
+        - "bash"
+        - "/scripts/flaresolverr-dns-web-healthcheck.sh"
     networks:
       - app_net
+    labels:
+      - com.torrents-stack.project=expressvpn-stack
 
   jackett:
     image: lscr.io/linuxserver/jackett:${JACKETT_IMAGE_TAG:-latest}
-    <<: [*defaults, *common-dns, *common-volumes]
+    <<: [*defaults, *common-dns]
     container_name: ${JACKETT_CONTAINER_NAME:-jackett}
     ports:
       - "${JACKETT_PORT:-9117}:9117"
@@ -142,13 +156,24 @@ services:
       JACKETT_CFG_PROXY_USERNAME: ${JACKETT_CFG_PROXY_USERNAME:-null}
       JACKETT_CFG_PROXY_PASSWORD: ${JACKETT_CFG_PROXY_PASSWORD:-null}
       JACKETT_CFG_PROXY_IS_ANONYMOUS: ${JACKETT_CFG_PROXY_IS_ANONYMOUS:-true}
+    volumes:
+      - ./scripts:/scripts:ro
+      - shared-volume:/shared_data
+      - ${HOST_CONFIGS_DIR:-./configs}:${CONTAINER_CONFIGS_DIR:-/config}
+      - ${HOST_DOWNLOADS_DIR:-./downloads}:${CONTAINER_DOWNLOADS_DIR:-/downloads}
     healthcheck:
       <<: *common-health
-      test: *jackett-healthcheck-test
+      test:
+        - "CMD"
+        - "bash"
+        - "-c"
+        - "/scripts/jackett-healthcheck.sh && /scripts/jackett-dns-web-healthcheck.sh && curl -sf http://flaresolverr:8191/ | grep -q 'FlareSolverr'"
     depends_on:
       flaresolverr: *depends-on-healthy
     networks:
       - app_net
+    labels:
+      - com.torrents-stack.project=expressvpn-stack
 
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:${QBITTORRENT_IMAGE_TAG:-latest}
@@ -164,18 +189,28 @@ services:
       QBITTORRENT_JACKETT_THREAD_COUNT: ${QBITTORRENT_JACKETT_THREAD_COUNT:-20}
       QBITTORRENT_JACKETT_TRACKER_FIRST: ${QBITTORRENT_JACKETT_TRACKER_FIRST:-false}
       QBITTORRENT_JACKETT_PLUGIN_URL: ${QBITTORRENT_JACKETT_PLUGIN_URL:-https://raw.githubusercontent.com/qbittorrent/search-plugins/fa0be6abdc47b8622e8ec71a0d4427d9a7770eab/nova3/engines/jackett.py}
+      QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT: ${QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT}
     volumes:
+      - ./scripts:/scripts:ro
       - ${HOST_CONFIGS_DIR:-./configs}:${CONTAINER_CONFIGS_DIR:-/config}
       - ${HOST_DOWNLOADS_DIR:-./downloads}:${CONTAINER_DOWNLOADS_DIR:-/downloads}
       - shared-volume:/shared_data
       - ./scripts/bootstrap-qbittorrent-jackett.sh:/tmp/bootstrap-qbittorrent-jackett.sh:ro
     healthcheck:
       <<: *common-health
-      test: *qbittorrent-healthcheck-test
+      test:
+        - "CMD"
+        - "bash"
+        - "-c"
+        - "/scripts/qbittorrent-healthcheck.sh && /scripts/qbittorrent-vpn-healthcheck.sh && /scripts/qbittorrent-expressvpn-healthcheck.sh"
     depends_on:
       expressvpn: *depends-on-healthy
       jackett: *depends-on-healthy
       flaresolverr: *depends-on-healthy
+    labels:
+      - com.torrents-stack.project=expressvpn-stack
 
 volumes:
   shared-volume:
+    labels:
+      - com.torrents-stack.project=expressvpn-stack

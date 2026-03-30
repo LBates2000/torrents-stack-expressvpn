@@ -29,46 +29,6 @@ function Convert-NullToken {
     return $Value
 }
 
-function Normalize-PathPrefix {
-    param([string]$PathValue)
-
-    if ([string]::IsNullOrWhiteSpace($PathValue)) {
-        return '/downloads'
-    }
-
-    $trimmed = $PathValue.Trim()
-    while ($trimmed.Length -gt 1 -and $trimmed.EndsWith('/')) {
-        $trimmed = $trimmed.Substring(0, $trimmed.Length - 1)
-    }
-    return $trimmed
-}
-
-function Resolve-HostPath {
-    param(
-        [string]$RepoRoot,
-        [string]$ConfiguredPath,
-        [string]$DefaultRelativePath
-    )
-
-    $pathValue = $ConfiguredPath
-    if ([string]::IsNullOrWhiteSpace($pathValue)) {
-        $pathValue = $DefaultRelativePath
-    }
-
-    if ([System.IO.Path]::IsPathRooted($pathValue)) {
-        return [System.IO.Path]::GetFullPath($pathValue)
-    }
-
-    return [System.IO.Path]::GetFullPath((Join-Path $RepoRoot $pathValue))
-}
-
-function Ensure-Directory {
-    param([string]$Path)
-
-    if (-not (Test-Path -LiteralPath $Path)) {
-        New-Item -ItemType Directory -Path $Path -Force | Out-Null
-    }
-}
 
 <#
 .SYNOPSIS
@@ -120,10 +80,10 @@ $downloadsRoot = Resolve-HostPath -RepoRoot $repoRoot -ConfiguredPath $envMap['H
 $jackettConfigDir = Join-Path $configsRoot 'Jackett'
 $configPath = Join-Path $jackettConfigDir 'ServerConfig.json'
 
-Ensure-Directory -Path $jackettConfigDir
-Ensure-Directory -Path (Join-Path $downloadsRoot 'watch')
+New-DirectoryIfMissing -Path $jackettConfigDir
+New-DirectoryIfMissing -Path (Join-Path $downloadsRoot 'watch')
 
-$downloadsBase = Normalize-PathPrefix -PathValue $envMap['CONTAINER_DOWNLOADS_DIR']
+$downloadsBase = Convert-PathPrefix -PathValue $envMap['CONTAINER_DOWNLOADS_DIR']
 $defaultBlackholeDir = "$downloadsBase/watch"
 
 $propertyMappings = @(
