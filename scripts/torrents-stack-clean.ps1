@@ -32,8 +32,11 @@ try {
             Start-Stack -Action 'startup'
         }
         'stop' {
-            Write-Host '==> Stopping stack...'
-            docker compose down
+            . "$PSScriptRoot/shared-functions.ps1"
+            Write-ProgressLine '==> Stopping stack...' -Color Yellow
+            docker compose down | Out-Null
+            Write-ProgressLine '==> Stack stopped.   ' -Color Yellow
+            Write-Host ''
         }
         'restart' {
             Stop-Stack

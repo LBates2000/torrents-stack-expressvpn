@@ -8,27 +8,21 @@ This stack routes only qBittorrent through ExpressVPN.
 
 ## Stack Commands (Wrapper Script)
 
-**Primary entrypoint:**
+Primary entrypoint:
 ```
 pwsh ./scripts/torrents-stack.ps1 <command>
 ```
 
+Authoritative command descriptions live in the script usage output and help:
 
+```
+pwsh ./scripts/torrents-stack.ps1
+Get-Help ./scripts/torrents-stack.ps1 -Detailed
+```
 
-**Available commands:**
+Supported commands: `start`, `stop`, `restart`, `update`, `status`, `logs`, `sync`, `rebuild`, `clean`, `test-all`.
 
-- `start`     — Sync configs then bring the stack up (detached)
-- `stop`      — Stop and remove containers (volumes are preserved)
-- `restart`   — Stop then start
-- `update`    — Pull latest images then restart
-- `status`    — Show running container status
-- `logs`      — Tail logs for all services (or a specific service)
-- `sync`      — Sync config files from .env without touching containers
-- `rebuild`   — Rebuild the stack from scratch (all containers and images are removed)
-- `clean`     — Stop and remove all containers, volumes, and prune all unused Docker resources (does not rebuild or start the stack)
-- `test-all`  — Run all stack commands in logical order, checking status and health at each step, and report final success or failure
-
-**Example:**
+Example:
 ```
 pwsh ./scripts/torrents-stack.ps1 start
 ```
@@ -87,7 +81,7 @@ EXPRESSVPN_PROTOCOL=auto
 - Install Docker Desktop (or Docker Engine + Compose plugin).
 - Set your ExpressVPN activation code using `.env` values from `.env.example`.
 - Copy `.env.example` to `.env` and adjust values for your host/network.
-- The sync/start scripts auto-create missing runtime directories and seed config files under `HOST_CONFIGS_DIR` and `HOST_DOWNLOADS_DIR`.
+- The sync/start scripts resolve runtime paths from `.env` once and auto-create missing directories and seed config files under `HOST_CONFIGS_DIR` and `HOST_DOWNLOADS_DIR`.
 - Start the stack with `pwsh ./scripts/torrents-stack.ps1 start`.
 
 ### Quick start
@@ -105,7 +99,7 @@ pwsh ./scripts/torrents-stack.ps1 start
 
 ## Commands
 - Use the wrapper script section above for the primary lifecycle commands.
-- For lower-level operations (rebuild/reset), use the `docker compose` flows below.
+- Use the `docker compose` flows below only for lower-level rebuild/reset work.
 
 ## Rebuild options
 Full rebuild with fresh images:
@@ -133,6 +127,7 @@ docker compose up --force-recreate -d
 ## Config directories
 - Local data is mounted from `HOST_CONFIGS_DIR` to `CONTAINER_CONFIGS_DIR` (defaults: `./configs` -> `/config`).
 - Torrent downloads are stored from `HOST_DOWNLOADS_DIR` to `CONTAINER_DOWNLOADS_DIR` (defaults: `./downloads` -> `/downloads`).
+- The PowerShell scripts use the same shared path resolution logic as the compose file, so backups, validation, and config sync all follow those overrides consistently.
 
 ## Image pinning
 - Images default to `latest` in `docker-compose.yml` via environment-backed tags.
@@ -203,6 +198,11 @@ HEALTHCHECK_START_PERIOD=45s
 - `jackett`: checks `http://localhost:9117/` and accepts `200`, `301`, or `302`
 - `qbittorrent`: checks `http://localhost:8080/` and accepts `200` or `302`
 
+## Compose Validate smoke-test input
+- The `Compose Validate` workflow includes an optional manual input named `expressvpn_activation_code`.
+- On `push` and `pull_request`, smoke-test steps are skipped unless that input is provided (non-empty).
+- To run the smoke-test manually in GitHub Actions: open `Compose Validate` -> `Run workflow` -> set `expressvpn_activation_code`.
+
 ## Startup timing (observed)
 - Typical clean startup on this host: ~70-80 seconds.
 - Recent 3-run sample on current config:
@@ -213,7 +213,7 @@ HEALTHCHECK_START_PERIOD=45s
 | Avg | 73.74 |
 | Max | 77.90 |
 
-- Shared healthcheck cadence defaults: `interval=20s`, `timeout=10s`, `retries=8`, `start_period=30s` (override via `HEALTHCHECK_*` in `.env`).
+- Shared healthcheck cadence defaults: `interval=30s`, `timeout=30s`, `retries=10`, `start_period=180s` (override via `HEALTHCHECK_*` in `.env`).
 - If startup exceeds 2-3 minutes, check logs.
 
 ### Quick diagnostics
@@ -247,6 +247,13 @@ HEALTHCHECK_START_PERIOD=45s
 ## Backup and restore
 The repository includes a monthly reminder workflow that opens a backup/restore verification issue:
 - `Backup Restore Reminder` workflow: https://github.com/LBates2000/torrents-stack-expressvpn/actions/workflows/backup-restore-reminder.yml
+
+The bundled PowerShell helpers also respect `HOST_CONFIGS_DIR` and `HOST_DOWNLOADS_DIR`, so backup and restore follow the same directories used by the sync scripts and compose mounts:
+
+```powershell
+pwsh ./scripts/backup-configs.ps1
+pwsh ./scripts/restore-configs.ps1 -Archive .\backups\stack-backup-<timestamp>.zip
+```
 
 Backup runtime config (PowerShell):
 ```powershell
@@ -291,3 +298,12 @@ docker compose ps --format "table {{.Name}}\t{{.State}}\t{{.Health}}\t{{.Status}
 
 ## Author
 - Lawrence Bates (<Lawrence.Bates@gmail.com>)
+
+## Cross-Platform Support
+- All scripts are tested with PowerShell Core (pwsh) on Windows and Linux.
+- Bash healthcheck scripts require bash and standard Unix tools.
+- If you encounter OS-specific issues, please open an issue or PR.
+
+## Environment Variable Overrides
+- Primary runtime overrides live in `.env.example`; keep that file aligned with any new variables.
+- Most scripts read the same `.env` values as the compose stack, which keeps sync, validation, backup, and lifecycle commands aligned for CI and local automation.

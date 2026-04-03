@@ -1,6 +1,7 @@
 param(
     [switch]$SkipRestart,
-    [switch]$Verbose
+    [switch]$Verbose,
+    [switch]$EmitStatus
 )
 
 Set-StrictMode -Version Latest
@@ -92,7 +93,7 @@ function Get-IniSetting {
     return $null
 }
 
-function Try-Get-QbittorrentSaltBytes {
+function ConvertFrom-QbittorrentSaltValue {
     param([string]$ExistingValue)
 
     if ([string]::IsNullOrWhiteSpace($ExistingValue)) {
@@ -122,8 +123,8 @@ function Try-Get-QbittorrentSaltBytes {
     Uses 100,000 iterations (qBittorrent standard) and 16-byte random salt if not provided.
     Reuses existing salt if provided to maintain idempotency across multiple runs.
 
-.PARAMETER PlaintextPassword
-    The plaintext password to hash.
+.PARAMETER Password
+    The password to hash as a SecureString.
 
 .PARAMETER SaltBytes
     Optional. 16-byte salt for the PBKDF2 derivation. If not provided or empty,
@@ -140,7 +141,7 @@ function Try-Get-QbittorrentSaltBytes {
 function New-QbittorrentPasswordHash {
     param(
         [Parameter(Mandatory)]
-        [string]$PlaintextPassword,
+        [System.Security.SecureString]$Password,
         [byte[]]$SaltBytes
     )
 
@@ -150,7 +151,15 @@ function New-QbittorrentPasswordHash {
         [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($SaltBytes)
     }
 
-    $passwordBytes = [System.Text.Encoding]::UTF8.GetBytes($PlaintextPassword)
+    $passwordBstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Password)
+    try {
+        $passwordValue = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordBstr)
+        $passwordBytes = [System.Text.Encoding]::UTF8.GetBytes($passwordValue)
+    }
+    finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordBstr)
+    }
+
     $pbkdf2 = [System.Security.Cryptography.Rfc2898DeriveBytes]::new(
         $passwordBytes,
         $SaltBytes,
@@ -213,17 +222,16 @@ function Get-JsonFromEnv {
 }
 
 
-$repoRoot = Split-Path -Parent $PSScriptRoot
-$envPath = Join-Path $repoRoot '.env'
+$stackContext = Get-StackContext -ScriptRoot $PSScriptRoot
 
-if (-not (Test-Path -LiteralPath $envPath)) {
-    throw "Missing .env file at $envPath"
+if (-not (Test-Path -LiteralPath $stackContext.EnvPath)) {
+    throw "Missing .env file at $($stackContext.EnvPath)"
 }
 
-$envMap = Get-EnvMap -Path $envPath
-
-$configsRoot = Resolve-HostPath -RepoRoot $repoRoot -ConfiguredPath $envMap['HOST_CONFIGS_DIR'] -DefaultRelativePath './configs'
-$downloadsRoot = Resolve-HostPath -RepoRoot $repoRoot -ConfiguredPath $envMap['HOST_DOWNLOADS_DIR'] -DefaultRelativePath './downloads'
+$repoRoot = $stackContext.RepoRoot
+$envMap = $stackContext.EnvMap
+$configsRoot = $stackContext.ConfigsRoot
+$downloadsRoot = $stackContext.DownloadsRoot
 $qbittorrentConfigDir = Join-Path $configsRoot 'qBittorrent'
 $configPath = Join-Path $qbittorrentConfigDir 'qBittorrent.conf'
 $categoriesPath = Join-Path $qbittorrentConfigDir 'categories.json'
@@ -343,8 +351,9 @@ $passwordGeneratedFromPlaintext = $false
 if ([string]::IsNullOrWhiteSpace($webUiPasswordHashValue) -and -not [string]::IsNullOrWhiteSpace($webUiPasswordPlaintext)) {
     if ($Verbose) { Write-Host 'Generating qBittorrent password hash from plaintext...' }
     $existingPasswordValue = Get-IniSetting -Lines $lineList -Section 'Preferences' -Key 'WebUI\Password_PBKDF2'
-    $existingSaltBytes = Try-Get-QbittorrentSaltBytes -ExistingValue $existingPasswordValue
-    $webUiPasswordHashValue = New-QbittorrentPasswordHash -PlaintextPassword $webUiPasswordPlaintext -SaltBytes $existingSaltBytes
+    $existingSaltBytes = ConvertFrom-QbittorrentSaltValue -ExistingValue $existingPasswordValue
+    $securePassword = ConvertTo-SecureString -String $webUiPasswordPlaintext -AsPlainText -Force
+    $webUiPasswordHashValue = New-QbittorrentPasswordHash -Password $securePassword -SaltBytes $existingSaltBytes
     $passwordGeneratedFromPlaintext = $true
     if ($Verbose) { Write-Host 'Password hash generated successfully' }
 }
@@ -380,7 +389,10 @@ if (-not $SkipRestart) {
         $qbittorrentWasRunningBeforeChanges = $runningServices -contains 'qbittorrent'
 
         if ($qbittorrentWasRunningBeforeChanges -and $hasChanges) {
-            docker compose stop qbittorrent | Out-Host
+            . "$PSScriptRoot/shared-functions.ps1"
+            Write-ProgressLine 'Stopping qbittorrent...' -Color Yellow
+            docker compose stop qbittorrent | Out-Null
+            Write-ProgressLine 'Stopped qbittorrent.  ' -Color Yellow
             $qbittorrentWasStoppedForConfigWrite = $true
         }
     }
@@ -416,10 +428,13 @@ if ($anyChanges -and -not $SkipRestart) {
         Push-Location $repoRoot
         try {
             if (-not $qbittorrentWasStoppedForConfigWrite) {
-                docker compose stop qbittorrent | Out-Host
+                Write-ProgressLine 'Stopping qbittorrent...' -Color Yellow
+                docker compose stop qbittorrent | Out-Null
+                Write-ProgressLine 'Stopped qbittorrent.  ' -Color Yellow
             }
-
-            docker compose start qbittorrent | Out-Host
+            Write-ProgressLine 'Starting qbittorrent...' -Color Yellow
+            docker compose start qbittorrent | Out-Null
+            Write-ProgressLine 'Started qbittorrent.   ' -Color Yellow
             Write-Host 'Restarted qbittorrent to apply config changes'
         }
         finally {
@@ -450,3 +465,7 @@ elseif ($anyChanges) {
 Write-Host "qBittorrent.conf changed: $hasChanges"
 Write-Host "categories.json changed: $categoriesChanged"
 Write-Host "watched_folders.json changed: $watchedFoldersChanged"
+
+if ($EmitStatus) {
+    Write-Output ("SYNC_STATUS:qbittorrent:{0}" -f $anyChanges.ToString().ToLowerInvariant())
+}

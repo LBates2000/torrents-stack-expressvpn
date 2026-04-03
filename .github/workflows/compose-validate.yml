@@ -5,13 +5,19 @@ on:
     branches: ['**']
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      expressvpn_activation_code:
+        description: 'Optional ExpressVPN activation code for smoke-test runs'
+        required: false
+        default: ''
 
 jobs:
   validate-compose:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Show Docker versions
         run: |
@@ -25,11 +31,11 @@ jobs:
     needs: validate-compose
     runs-on: ubuntu-latest
     env:
-      EXPRESSVPN_ACTIVATION_CODE: ${{ secrets.EXPRESSVPN_ACTIVATION_CODE }}
+      EXPRESSVPN_ACTIVATION_CODE: ${{ github.event.inputs.expressvpn_activation_code }}
       EXPRESSVPN_HEALTHCHECK_MODE: relaxed
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Start stack
         if: env.EXPRESSVPN_ACTIVATION_CODE != ''

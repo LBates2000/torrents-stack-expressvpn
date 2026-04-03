@@ -1,15 +1,44 @@
-
 param(
     [Parameter(Position=0)]
     [ValidateSet('start','stop','restart','update','status','logs','sync','rebuild','clean','test-all')]
     [string]$Command = '',
     [string]$Service = '',
     [switch]$Follow,
-    [switch]$VerboseAuth
+    [switch]$VerboseAuth,
+    [switch]$DebugOutput
 )
 
+# Dot-source shared functions for dynamic table and utilities
+. "$PSScriptRoot/shared-functions.ps1"
+
+$CommandDescriptions = [ordered]@{
+    start   = 'Sync configs then bring the stack up (detached).'
+    stop    = 'Stop and remove containers (volumes are preserved).'
+    restart = 'Stop then start.'
+    update  = 'Pull latest images then restart.'
+    status  = 'Show running container status, plugin check, and optional auth diagnostics.'
+    logs    = 'Tail logs for all services (or a specific service).'
+    sync    = 'Sync config files from .env without touching containers.'
+    rebuild = 'Rebuild the stack from scratch (all containers and images are removed).'
+    clean   = 'Stop and remove all containers, volumes, and prune unused Docker resources.'
+    'test-all' = 'Run all stack commands in sequence and check health.'
+}
+
+function Show-CommandUsage {
+    Write-Host "`n[Usage] pwsh ./scripts/torrents-stack.ps1 <command> [-Service <name>] [-Follow] [-VerboseAuth]" -ForegroundColor Yellow
+    Write-Host "`nAvailable commands:" -ForegroundColor Yellow
+    foreach ($cmd in $CommandDescriptions.Keys) {
+        Write-Host ("  {0,-8} {1}" -f $cmd, $CommandDescriptions[$cmd]) -ForegroundColor Yellow
+    }
+}
+
 # --- Utility: Diagnose all stack containers ---
-function Diagnose-Stack {
+function Get-StackStatusReport {
+    # Placeholder for future stack status summary logic
+    Write-Host "[Diagnosis] Use Get-StackReport for full container status." -ForegroundColor Cyan
+}
+
+function Get-StackReport {
     $services = @('expressvpn','flaresolverr','jackett','qbittorrent')
     Write-Host "[Diagnosis] Full container status for all stack services:" -ForegroundColor Cyan
     $all = docker ps -a --filter "label=com.torrents-stack.project=expressvpn-stack" --format "table {{.Names}}\t{{.Status}}\t{{.ID}}"
@@ -35,12 +64,14 @@ function Show-ServiceStatusTable {
         [hashtable]$serviceStatus,
         [string[]]$services
     )
-    Clear-Host
+    try { Clear-Host } catch {}
     Write-Host "[Health Poll] Service Statuses (updated: $(Get-Date -Format 'HH:mm:ss'))" -ForegroundColor Cyan
-    Write-Host ("{0,-15} {1,-12}" -f 'Service','Status') -ForegroundColor Yellow
-    Write-Host ("{0,-15} {1,-12}" -f '-------','------') -ForegroundColor Yellow
+    Write-Host ("{0,-15} {1,-14} {2,-12}" -f 'Service','Container ID','Status') -ForegroundColor Yellow
+    Write-Host ("{0,-15} {1,-14} {2,-12}" -f '-------','------------','------') -ForegroundColor Yellow
     foreach ($svc in $services) {
         $status = $serviceStatus[$svc]
+        $shortId = docker inspect --format='{{slice .Id 0 12}}' $svc 2>$null
+        if (-not $shortId) { $shortId = '--' }
         $color = switch ($status) {
             'healthy'    { 'Green' }
             'starting'   { 'Yellow' }
@@ -48,55 +79,40 @@ function Show-ServiceStatusTable {
             'not found'  { 'Gray' }
             default      { 'White' }
         }
-        Write-Host ("{0,-15} {1,-12}" -f $svc, $status) -ForegroundColor $color
+        Write-Host ("{0,-15} {1,-14} {2,-12}" -f $svc, $shortId, $status) -ForegroundColor $color
     }
 }
 
-Write-Host '[Test] torrents-stack.ps1 script started.' -ForegroundColor Yellow
+
+function Write-DebugLine {
+    param([string]$Message)
+    if ($DebugOutput) { Write-Host "[Debug] $Message" -ForegroundColor Magenta }
+}
+
+Write-Host '========== torrents-stack.ps1 ==========' -ForegroundColor Yellow
+Write-Host '[Test] Script started.' -ForegroundColor Yellow
 
 # Show usage/help if required parameter is missing (for direct invocation)
 if (-not $PSBoundParameters.ContainsKey('Command') -or [string]::IsNullOrWhiteSpace($Command)) {
-    Write-Host "\n[Usage] pwsh ./scripts/torrents-stack.ps1 <command> [-Service <name>] [-Follow] [-VerboseAuth]" -ForegroundColor Yellow
-    Write-Host "\nAvailable commands:" -ForegroundColor Yellow
-    Write-Host "  start     Sync configs then bring the stack up (detached)." -ForegroundColor Yellow
-    Write-Host "  stop      Stop and remove containers (volumes are preserved)." -ForegroundColor Yellow
-    Write-Host "  restart   Stop then start." -ForegroundColor Yellow
-    Write-Host "  update    Pull latest images then restart." -ForegroundColor Yellow
-    Write-Host "  status    Show running container status." -ForegroundColor Yellow
-    Write-Host "  logs      Tail logs for all services (or a specific service)." -ForegroundColor Yellow
-    Write-Host "  sync      Sync config files from .env without touching containers." -ForegroundColor Yellow
-    Write-Host "  rebuild   Rebuild the stack from scratch (all containers and images are removed)." -ForegroundColor Yellow
-    Write-Host "  clean     Remove all containers, volumes, and Docker resources." -ForegroundColor Yellow
-    Write-Host "  test-all  Run all stack commands in sequence and check health." -ForegroundColor Yellow
+    Show-CommandUsage
     exit 1
 }
 <#
 .SYNOPSIS
     Manage the torrents-stack-expressvpn Docker Compose stack.
-
 .DESCRIPTION
     Wrapper script for common stack operations. Syncs configuration from .env
     before starting services so containers always boot with up-to-date config.
-
 .PARAMETER Command
-    start     Sync configs then bring the stack up (detached).
-    stop      Stop and remove containers (volumes are preserved).
-    restart   Stop then start.
-    update    Pull latest images then restart.
-    status    Show running container status.
-    logs      Tail logs for all services (or a specific service).
-    sync      Sync config files from .env without touching containers.
-    rebuild   Rebuild the stack from scratch (all containers and images are removed).
-
+    The stack command to run. Execute the script without parameters to print command descriptions.
 .PARAMETER Service
     Optional. Scope 'logs' to a specific service (expressvpn, flaresolverr, jackett, qbittorrent).
-
 .PARAMETER Follow
     When used with 'logs', keep streaming output (default: true).
-
 .PARAMETER VerboseAuth
     When used with 'status', prints extra authentication-check diagnostics.
-
+.PARAMETER DebugOutput
+    Enables verbose debug output for troubleshooting.
 .EXAMPLE
     pwsh ./scripts/torrents-stack.ps1 start
     pwsh ./scripts/torrents-stack.ps1 stop
@@ -108,6 +124,9 @@ if (-not $PSBoundParameters.ContainsKey('Command') -or [string]::IsNullOrWhiteSp
     pwsh ./scripts/torrents-stack.ps1 logs -Service jackett
     pwsh ./scripts/torrents-stack.ps1 sync
     pwsh ./scripts/torrents-stack.ps1 rebuild
+    pwsh ./scripts/torrents-stack.ps1 test-all
+.NOTES
+    Run Get-Help ./scripts/torrents-stack.ps1 -Full for details.
 #>
 
 
@@ -115,39 +134,202 @@ if (-not $PSBoundParameters.ContainsKey('Command') -or [string]::IsNullOrWhiteSp
 
 # --- Function Definitions ---
 
-$repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$stackContext = Get-StackContext -ScriptRoot $PSScriptRoot
+$repoRoot = Resolve-Path $stackContext.RepoRoot
 Set-Location $repoRoot
 
 
-function Ensure-Clean {
+function Invoke-StackClean {
     Write-Host '[Command] Ensuring clean stack state...' -ForegroundColor Cyan
     & pwsh $PSCommandPath clean
+}
+
+function ConvertTo-BoolFromStatusLine {
+    param(
+        [string[]]$Lines,
+        [string]$ServiceName
+    )
+
+    foreach ($line in @($Lines)) {
+        if ($line -match "^SYNC_STATUS:${ServiceName}:(true|false)$") {
+            return [System.Convert]::ToBoolean($matches[1])
+        }
+    }
+
+    return $false
+}
+
+function Get-ContainerEnvMap {
+    param([string]$ContainerName)
+
+    $map = @{}
+    $envLines = docker inspect --format='{{range .Config.Env}}{{println .}}{{end}}' $ContainerName 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        return $map
+    }
+
+    foreach ($line in @($envLines)) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        $eqIndex = $line.IndexOf('=')
+        if ($eqIndex -lt 1) { continue }
+        $map[$line.Substring(0, $eqIndex)] = $line.Substring($eqIndex + 1)
+    }
+
+    return $map
+}
+
+function Test-ExpressvpnRefreshNeeded {
+    param([hashtable]$EnvMap)
+
+    $runningServices = @(docker compose ps --status running --services)
+    if ($runningServices -notcontains 'expressvpn') {
+        Write-Host '[Decision] expressvpn refresh not needed: service is not already running.' -ForegroundColor Gray
+        return $false
+    }
+
+    $containerEnv = Get-ContainerEnvMap -ContainerName 'expressvpn'
+    if ($containerEnv.Count -eq 0) {
+        Write-Host '[Decision] expressvpn refresh not needed: running container env could not be inspected.' -ForegroundColor Gray
+        return $false
+    }
+
+    $desiredEnv = @{
+        'ACTIVATION_CODE' = Get-EnvOrDefault -EnvMap $EnvMap -Key 'EXPRESSVPN_ACTIVATION_CODE' -DefaultValue ''
+        'REGION' = Get-EnvOrDefault -EnvMap $EnvMap -Key 'EXPRESSVPN_REGION' -DefaultValue 'uk-docklands'
+        'SERVER' = Get-EnvOrDefault -EnvMap $EnvMap -Key 'EXPRESSVPN_REGION' -DefaultValue 'uk-docklands'
+        'PROTOCOL' = Get-EnvOrDefault -EnvMap $EnvMap -Key 'EXPRESSVPN_PROTOCOL' -DefaultValue 'auto'
+        'EXPRESSVPN_HEALTHCHECK_MODE' = Get-EnvOrDefault -EnvMap $EnvMap -Key 'EXPRESSVPN_HEALTHCHECK_MODE' -DefaultValue 'strict'
+    }
+
+    foreach ($key in $desiredEnv.Keys) {
+        $currentValue = if ($containerEnv.ContainsKey($key)) { [string]$containerEnv[$key] } else { '' }
+        if ($currentValue -ne [string]$desiredEnv[$key]) {
+            Write-Host ("[Decision] expressvpn will be recreated: {0} changed." -f $key) -ForegroundColor Yellow
+            return $true
+        }
+    }
+
+    Write-Host '[Decision] expressvpn refresh not needed: running env already matches .env.' -ForegroundColor Gray
+    return $false
+}
+
+function Invoke-StartRefreshPlan {
+    param(
+        [hashtable]$SyncStatus,
+        [string[]]$RunningServicesBeforeStart,
+        [bool]$ExpressvpnRefreshNeeded
+    )
+
+    if ($ExpressvpnRefreshNeeded) {
+        Write-Host '[Step] Recreating expressvpn to apply env changes...' -ForegroundColor Cyan
+        Show-CommandProgressTable -Command 'docker compose up -d --force-recreate --no-deps expressvpn' -LogPrefix 'expressvpn-refresh'
+
+        $runningServicesAfterExpressvpnRefresh = @(docker compose ps --status running --services)
+        if ($runningServicesAfterExpressvpnRefresh -contains 'qbittorrent') {
+            Write-Host '[Decision] qbittorrent will be recreated: expressvpn was recreated.' -ForegroundColor Yellow
+            Write-Host '[Step] Recreating qbittorrent to reattach it to expressvpn...' -ForegroundColor Cyan
+            Show-CommandProgressTable -Command 'docker compose up -d --force-recreate --no-deps qbittorrent' -LogPrefix 'qbittorrent-refresh'
+        } else {
+            Write-Host '[Decision] qbittorrent recreate skipped: service is not already running after expressvpn refresh.' -ForegroundColor Gray
+        }
+    } else {
+        Write-Host '[Decision] expressvpn recreate skipped.' -ForegroundColor Gray
+    }
+
+    if ($SyncStatus['jackett'] -and ($RunningServicesBeforeStart -contains 'jackett')) {
+        Write-Host '[Decision] jackett will be restarted: synced config changed.' -ForegroundColor Yellow
+        Write-Host '[Step] Restarting jackett to apply synced config...' -ForegroundColor Cyan
+        Show-CommandProgressTable -Command 'docker compose restart jackett' -LogPrefix 'jackett-restart'
+    } elseif ($SyncStatus['jackett']) {
+        Write-Host '[Decision] jackett restart skipped: config changed but service is not already running.' -ForegroundColor Gray
+    } else {
+        Write-Host '[Decision] jackett restart not needed: synced config did not change.' -ForegroundColor Gray
+    }
+
+    if ($SyncStatus['qbittorrent'] -and ($RunningServicesBeforeStart -contains 'qbittorrent') -and -not $ExpressvpnRefreshNeeded) {
+        Write-Host '[Decision] qbittorrent will be restarted: synced config changed.' -ForegroundColor Yellow
+        Write-Host '[Step] Restarting qbittorrent to apply synced config...' -ForegroundColor Cyan
+        Show-CommandProgressTable -Command 'docker compose restart qbittorrent' -LogPrefix 'qbittorrent-restart'
+    } elseif ($SyncStatus['qbittorrent'] -and $ExpressvpnRefreshNeeded) {
+        Write-Host '[Decision] qbittorrent standalone restart skipped: expressvpn recreate path handles it.' -ForegroundColor Gray
+    } elseif ($SyncStatus['qbittorrent']) {
+        Write-Host '[Decision] qbittorrent restart skipped: config changed but service is not already running.' -ForegroundColor Gray
+    } else {
+        Write-Host '[Decision] qbittorrent restart not needed: synced config did not change.' -ForegroundColor Gray
+    }
 }
 
 # --- Shared Orchestration Functions ---
 function Sync-Configs {
     Write-Host '[Step] Syncing configs...' -ForegroundColor Cyan
-    # Add config sync logic here
+    $jackettStatusLines = & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'sync-jackett-config.ps1') -SkipRestart -EmitStatus
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Jackett config sync failed.'
+    }
+
+    $qbittorrentStatusLines = & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'sync-qbittorrent-config.ps1') -SkipRestart -EmitStatus
+    if ($LASTEXITCODE -ne 0) {
+        throw 'qBittorrent config sync failed.'
+    }
+
+    return @{
+        jackett = ConvertTo-BoolFromStatusLine -Lines $jackettStatusLines -ServiceName 'jackett'
+        qbittorrent = ConvertTo-BoolFromStatusLine -Lines $qbittorrentStatusLines -ServiceName 'qbittorrent'
+    }
 }
 
 function Show-Stack-Status {
-    Write-Host "\n[Status] Stack status:" -ForegroundColor Green
+    Write-Host "`n[Status] Stack status:" -ForegroundColor Green
     docker compose ps
 }
 
 function Show-Recent-Logs {
-    param([int]$Tail = 30)
+    param(
+        [int]$Tail = 30,
+        [datetime]$Since
+    )
     $services = @('jackett','qbittorrent','flaresolverr','expressvpn')
     foreach ($svc in $services) {
-        Write-Host "\n[Logs] Recent $svc logs:" -ForegroundColor Yellow
-        docker compose logs --tail=$Tail $svc
+        Write-Host "`n[Logs] Recent $svc logs:" -ForegroundColor Yellow
+        $logArgs = @('compose', 'logs', "--tail=$Tail")
+        if ($PSBoundParameters.ContainsKey('Since')) {
+            $logArgs += '--since'
+            $logArgs += $Since.ToString('o')
+        }
+        $logArgs += $svc
+        & docker @logArgs
+    }
+}
+
+function Get-ServiceEndpoints {
+    return @(
+        [pscustomobject]@{ Service = 'qBittorrent'; Url = "http://localhost:$($stackContext.QbittorrentWebUiPort)/" },
+        [pscustomobject]@{ Service = 'Jackett'; Url = "http://localhost:$($stackContext.JackettPort)/" },
+        [pscustomobject]@{ Service = 'FlareSolverr'; Url = "http://localhost:$($stackContext.FlareSolverrPort)/" }
+    )
+}
+
+function Show-ServiceEndpoints {
+    Write-Host "`n[Links] Service endpoints:" -ForegroundColor Cyan
+    foreach ($endpoint in (Get-ServiceEndpoints)) {
+        $link = Get-TerminalHyperlink -Text $endpoint.Url -Url $endpoint.Url
+        Write-Host ("{0,-15} {1}" -f $endpoint.Service, $link) -ForegroundColor Green
     }
 }
 
 
 function Start-Stack {
+    param([hashtable]$SyncStatus)
+
     Write-Host '[Step] Bringing stack up...' -ForegroundColor Cyan
-    docker compose up -d
+    $logsSince = Get-Date
+    $envMap = $stackContext.EnvMap
+    $runningServicesBeforeStart = @(docker compose ps --status running --services)
+    $expressvpnRefreshNeeded = Test-ExpressvpnRefreshNeeded -EnvMap $envMap
+    # Show dynamic image pull progress
+    Show-DockerPullProgress -Command 'docker compose pull'
+    Show-CommandProgressTable -Command 'docker compose up -d' -LogPrefix 'docker-up'
+    Invoke-StartRefreshPlan -SyncStatus $SyncStatus -RunningServicesBeforeStart $runningServicesBeforeStart -ExpressvpnRefreshNeeded:$expressvpnRefreshNeeded
     $services = @('expressvpn','flaresolverr','jackett','qbittorrent')
     $maxWait = 600 # seconds (10 minutes)
     $interval = 5  # seconds
@@ -171,7 +353,8 @@ function Start-Stack {
         if ((Get-Date) - $startTime -gt ([TimeSpan]::FromSeconds($maxWait))) {
             Write-Host "[Health] Timeout waiting for all services to become healthy." -ForegroundColor Red
             $unhealthy = $services | Where-Object { $serviceStatus[$_] -ne 'healthy' }
-            if ($unhealthy.Count -gt 0) {
+            if ($null -eq $unhealthy -or $unhealthy -eq '') { $unhealthy = @() } else { $unhealthy = @($unhealthy) }
+            if (@($unhealthy).Count -gt 0) {
                 Write-Host ("[Diagnosis] The following service(s) are not healthy: {0}" -f ($unhealthy -join ", ")) -ForegroundColor Yellow
                 foreach ($svc in $unhealthy) {
                     Write-Host ("[Diagnosis] Last healthcheck log for ${svc}:") -ForegroundColor Magenta
@@ -196,15 +379,16 @@ function Start-Stack {
         Start-Sleep -Seconds $interval
     }
     Show-Stack-Status
-    Show-Recent-Logs
+    Show-Recent-Logs -Since $logsSince
 
     # After stack start, check if all expected containers are running
     $expected = @('expressvpn','flaresolverr','jackett','qbittorrent')
     $running = docker ps --filter "label=com.torrents-stack.project=expressvpn-stack" --format "{{.Names}}"
     $missing = $expected | Where-Object { $running -notcontains $_ }
-    if ($missing.Count -gt 0) {
+    if ($null -eq $missing -or $missing -eq '') { $missing = @() } else { $missing = @($missing) }
+    if (@($missing).Count -gt 0) {
         Write-Host ("[Diagnosis] Warning: Not all expected containers are running: {0}" -f ($missing -join ", ")) -ForegroundColor Yellow
-        Diagnose-Stack
+        Get-StackReport
     }
 }
 
@@ -212,7 +396,25 @@ function Start-Stack {
 
 function Stop-Stack {
     Write-Host '[Step] Stopping stack (containers only)...' -ForegroundColor Cyan
-    docker compose down
+    # Show progress for each container as it stops and is removed
+    $containers = docker ps -a --filter "label=com.torrents-stack.project=expressvpn-stack" --format "{{.Names}}"
+    if ($containers) {
+        foreach ($c in $containers) {
+            Write-ProgressLine "Container $c Stopping " -Color Yellow
+            docker stop $c | Out-Null
+            Write-ProgressLine "Container $c Stopped  " -Color Yellow
+            docker rm $c | Out-Null
+            Write-ProgressLine "Container $c Removed  " -Color Yellow
+        }
+    }
+    # Remove networks
+    $networks = docker network ls --filter "label=com.torrents-stack.project=expressvpn-stack" --format "{{.Name}}"
+    foreach ($n in $networks) {
+        Write-ProgressLine "Network $n Removing " -Color Yellow
+        docker network rm $n | Out-Null
+        Write-ProgressLine "Network $n Removed  " -Color Yellow
+    }
+    Write-Host ''
     $psOutput = docker compose ps
     if ($psOutput -match 'NAME|----') {
         Show-Stack-Status
@@ -228,8 +430,9 @@ function Remove-StackWithVolumes {
     Write-Host '[Step] Stopping and removing all project containers, volumes, and networks...' -ForegroundColor Cyan
     # Remove containers by label
     $containers = docker ps -a --filter "label=com.torrents-stack.project=expressvpn-stack" --format "{{.ID}}"
+    if ($null -eq $containers -or $containers -eq '') { $containers = @() } else { $containers = @($containers) }
     $removed = @()
-    if ($containers) {
+    if (@($containers).Count -gt 0) {
         docker rm -f $containers | Out-Null
         $removed += $containers
     }
@@ -242,16 +445,18 @@ function Remove-StackWithVolumes {
             $removed += $cid
         }
     }
-    if ($removed.Count -gt 0) {
+    $removed = @($removed) | Where-Object { $_ -and $_ -ne '' }
+    if (@($removed).Count -gt 0) {
         Write-Host ("[Clean] Removed containers: {0}" -f ($removed -join ", ")) -ForegroundColor Green
     } else {
         Write-Host '[Clean] No project containers found.' -ForegroundColor Yellow
     }
     # Remove volumes (force, even if dangling)
     $volumes = docker volume ls --filter "label=com.torrents-stack.project=expressvpn-stack" --format "{{.Name}}"
+    if ($null -eq $volumes -or $volumes -eq '') { $volumes = @() } else { $volumes = @($volumes) }
     $namedVolume = "torrents-stack-expressvpn_shared-volume"
     $removedVolumes = @()
-    if ($volumes) {
+    if (@($volumes).Count -gt 0) {
         foreach ($vol in $volumes) {
             docker volume rm -f $vol | Out-Null
             $removedVolumes += $vol
@@ -262,14 +467,16 @@ function Remove-StackWithVolumes {
         docker volume rm -f $namedVolume | Out-Null
         $removedVolumes += $namedVolume
     }
-    if ($removedVolumes.Count -gt 0) {
+    $removedVolumes = @($removedVolumes) | Where-Object { $_ -and $_ -ne '' }
+    if (@($removedVolumes).Count -gt 0) {
         Write-Host ("[Clean] Removed volumes: {0}" -f ($removedVolumes -join ", ")) -ForegroundColor Green
     } else {
         Write-Host '[Clean] No project volumes found.' -ForegroundColor Yellow
     }
     # Remove networks (force, even if in use)
     $networks = docker network ls --filter "label=com.torrents-stack.project=expressvpn-stack" --format "{{.ID}}"
-    if ($networks) {
+    if ($null -eq $networks -or $networks -eq '') { $networks = @() } else { $networks = @($networks) }
+    if (@($networks).Count -gt 0) {
         foreach ($net in $networks) {
             docker network rm $net | Out-Null
         }
@@ -283,17 +490,17 @@ function Remove-StackWithVolumes {
 
 function Clear-DockerUnused {
     Write-Host '[Step] Pruning all unused Docker resources (this may take a while)...' -ForegroundColor Cyan
-    docker system prune -af --volumes
+    Show-CommandProgressTable -Command 'docker system prune -af --volumes' -LogPrefix 'docker-prune'
 }
 
 function Build-Stack {
     Write-Host '[Step] Building all images from scratch (no cache)...' -ForegroundColor Cyan
-    docker compose build --no-cache
+    Show-DockerProgressTable -Command 'docker compose build --no-cache'
 }
 
 function Update-Images {
     Write-Host '[Step] Pulling latest images...' -ForegroundColor Cyan
-    docker compose pull
+    Show-DockerPullProgress -Command 'docker compose pull'
 }
 
 function Show-Logs {
@@ -305,7 +512,123 @@ function Show-Logs {
     & docker @logArgs
 }
 
+function Get-JackettApiKey {
+    param([hashtable]$EnvMap)
+
+    $apiKey = Get-EnvOrDefault -EnvMap $EnvMap -Key 'JACKETT_CFG_API_KEY' -DefaultValue ''
+    $source = '.env (JACKETT_CFG_API_KEY)'
+
+    if ([string]::IsNullOrWhiteSpace($apiKey) -or ($apiKey -eq 'null')) {
+        $jackettConfigPath = Join-Path $stackContext.ConfigsRoot 'Jackett/ServerConfig.json'
+        if (Test-Path -LiteralPath $jackettConfigPath) {
+            try {
+                $jackettConfig = Get-Content -LiteralPath $jackettConfigPath -Raw | ConvertFrom-Json
+                if ($jackettConfig.APIKey) {
+                    $apiKey = [string]$jackettConfig.APIKey
+                    $source = $jackettConfigPath
+                }
+            }
+            catch {
+            }
+        }
+    }
+
+    return [pscustomobject]@{
+        ApiKey = $apiKey
+        Source = $source
+    }
+}
+
+function Show-AuthChecks {
+    param(
+        [string[]]$RunningServices,
+        [switch]$VerboseAuth
+    )
+
+    Write-Host "`n[Auth] Authentication checks:" -ForegroundColor Cyan
+
+    $envMap = $stackContext.EnvMap
+    $qbitBaseUrl = "http://localhost:$($stackContext.QbittorrentWebUiPort)"
+    $jackettBaseUrl = "http://localhost:$($stackContext.JackettPort)"
+
+    if ($RunningServices -contains 'qbittorrent') {
+        $qbitPassword = Get-EnvOrDefault -EnvMap $envMap -Key 'QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT' -DefaultValue ''
+        if ([string]::IsNullOrWhiteSpace($qbitPassword)) {
+            Write-Host 'qBittorrent login check skipped: QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT is not set' -ForegroundColor Gray
+        }
+        else {
+            if ($VerboseAuth) {
+                Write-Host "qBittorrent auth target: $qbitBaseUrl"
+                Write-Host 'qBittorrent auth username: admin'
+            }
+            $secureQbitPassword = $qbitPassword | ConvertTo-SecureString -AsPlainText -Force
+            $qbitResult = Test-QbittorrentLogin -BaseUrl $qbitBaseUrl -Username 'admin' -Auth $secureQbitPassword
+            if ($qbitResult.Ok) {
+                Write-Host $qbitResult.Message
+            }
+            else {
+                Write-Warning $qbitResult.Message
+            }
+            if ($VerboseAuth) {
+                Write-Host "qBittorrent auth endpoint: $($qbitResult.Endpoint)"
+                Write-Host "qBittorrent auth status: $($qbitResult.StatusCode)"
+                Write-Host "qBittorrent auth body: $($qbitResult.Body)"
+            }
+        }
+    }
+    else {
+        Write-Host 'qBittorrent login check skipped: service is not running' -ForegroundColor Gray
+    }
+
+    if ($RunningServices -contains 'jackett') {
+        $jackettApi = Get-JackettApiKey -EnvMap $envMap
+        if ([string]::IsNullOrWhiteSpace($jackettApi.ApiKey) -or ($jackettApi.ApiKey -eq 'null')) {
+            Write-Host 'Jackett auth check skipped: API key not available from .env or configs/Jackett/ServerConfig.json' -ForegroundColor Gray
+        }
+        else {
+            if ($VerboseAuth) {
+                Write-Host "Jackett auth target: $jackettBaseUrl"
+                Write-Host "Jackett API key source: $($jackettApi.Source)"
+            }
+            $jackettResult = Test-JackettApiKey -BaseUrl $jackettBaseUrl -ApiKey $jackettApi.ApiKey
+            if ($jackettResult.Ok) {
+                Write-Host $jackettResult.Message
+            }
+            else {
+                Write-Warning $jackettResult.Message
+            }
+            if ($VerboseAuth) {
+                Write-Host "Jackett auth endpoint: $($jackettResult.Endpoint)"
+                Write-Host "Jackett auth status: $($jackettResult.StatusCode)"
+                if (-not [string]::IsNullOrWhiteSpace($jackettResult.Body)) {
+                    $preview = $jackettResult.Body
+                    if ($preview.Length -gt 180) {
+                        $preview = $preview.Substring(0, 180) + '...'
+                    }
+                    Write-Host "Jackett auth body preview: $preview"
+                }
+            }
+        }
+    }
+    else {
+        Write-Host 'Jackett auth check skipped: service is not running' -ForegroundColor Gray
+    }
+}
+
+function Test-DockerDaemonAvailable {
+    $null = docker info --format '{{.ServerVersion}}' 2>$null
+    return ($LASTEXITCODE -eq 0)
+}
+
 function Show-Status {
+    param([switch]$VerboseAuth)
+
+    if (-not (Test-DockerDaemonAvailable)) {
+        Write-Host '[Status] Docker daemon is unavailable. Start Docker Desktop/Engine and rerun status.' -ForegroundColor Yellow
+        Show-ServiceEndpoints
+        return
+    }
+
     $services = @('expressvpn','flaresolverr','jackett','qbittorrent')
     $serviceStatus = @{}
     foreach ($svc in $services) {
@@ -319,6 +642,30 @@ function Show-Status {
     Show-ServiceStatusTable -serviceStatus $serviceStatus -services $services
     Write-Host '[Status] Stack status (docker compose ps):' -ForegroundColor Green
     docker compose ps
+
+    Write-Host "`n[Status] qBittorrent Jackett plugin check:" -ForegroundColor Cyan
+    Test-QbittorrentJackettPlugin | Out-Null
+
+    $runningServices = @(docker compose ps --status running --services)
+    Show-AuthChecks -RunningServices $runningServices -VerboseAuth:$VerboseAuth
+
+    Show-ServiceEndpoints
+}
+
+function Invoke-TimedCommand {
+    param(
+        [string]$CommandName,
+        [string]$StartMessage,
+        [scriptblock]$Action,
+        [string]$DoneMessage
+    )
+
+    $cmdStart = Get-Date
+    Write-Host $StartMessage -ForegroundColor Cyan
+    & $Action
+    Write-Host $DoneMessage -ForegroundColor Green
+    $cmdEnd = Get-Date
+    Write-Host ("[Timing] Elapsed time for '{0}': {1}" -f $CommandName, ($cmdEnd - $cmdStart)) -ForegroundColor Yellow
 }
 
 
@@ -326,7 +673,7 @@ function Reset-Stack {
     Remove-StackWithVolumes
     Clear-DockerUnused
     Build-Stack
-    Start-Stack
+    Start-Stack -SyncStatus @{ jackett = $false; qbittorrent = $false }
 }
 
 function Test-Step {
@@ -346,33 +693,67 @@ function Test-Step {
 }
 
 function Test-Stack-All {
-    $scriptPath = $PSCommandPath
     $allPassed = $true
+    $stepResults = @{}
+    # Define steps and their dependencies (by name)
     $steps = @(
-        @{ Name = 'Clean (start)'; Action = { & pwsh $scriptPath clean } },
-        @{ Name = 'Start';         Action = { & pwsh $scriptPath start } },
-        @{ Name = 'Status';        Action = { & pwsh $scriptPath status } },
-        @{ Name = 'Logs';          Action = { & pwsh $scriptPath logs } },
-        @{ Name = 'Sync';          Action = { & pwsh $scriptPath sync } },
-        @{ Name = 'Update';        Action = { & pwsh $scriptPath update } },
-        @{ Name = 'Restart';       Action = { & pwsh $scriptPath restart } },
-        @{ Name = 'Rebuild';       Action = { & pwsh $scriptPath rebuild } },
-        @{ Name = 'Stop';          Action = { & pwsh $scriptPath stop } },
-        @{ Name = 'Clean (end)';   Action = { & pwsh $scriptPath clean } }
+        @{ Name = 'Clean (start)'; Action = { Remove-StackWithVolumes; Clear-DockerUnused }; DependsOn = @() },
+        @{ Name = 'Start';         Action = { $syncStatus = Sync-Configs; Start-Stack -SyncStatus $syncStatus }; DependsOn = @('Clean (start)') },
+        @{ Name = 'Status';        Action = { Show-Status }; DependsOn = @('Start') },
+        @{ Name = 'Logs';          Action = { Show-Logs -Service $null -Follow:$false }; DependsOn = @('Start') },
+        @{ Name = 'Sync';          Action = { $null = Sync-Configs }; DependsOn = @() },
+        @{ Name = 'Update';        Action = { Update-Images; $syncStatus = Sync-Configs; Start-Stack -SyncStatus $syncStatus }; DependsOn = @('Start') },
+        @{ Name = 'Restart';       Action = { Stop-Stack; $syncStatus = Sync-Configs; Start-Stack -SyncStatus $syncStatus }; DependsOn = @('Start') },
+        @{ Name = 'Rebuild';       Action = { Invoke-StackClean; Reset-Stack }; DependsOn = @('Clean (start)') },
+        @{ Name = 'Stop';          Action = { Stop-Stack }; DependsOn = @('Start') },
+        @{ Name = 'Clean (end)';   Action = { Remove-StackWithVolumes; Clear-DockerUnused }; DependsOn = @() }
     )
-    Write-Host ("[Debug] Test-Stack-All using script path: $scriptPath") -ForegroundColor Magenta
+    Write-Host '========== TEST SEQUENCE ==========' -ForegroundColor Cyan
+    Write-DebugLine "Test-Stack-All running in-process with dependency checks"
+    $stepStatus = @{}
     foreach ($step in $steps) {
-        $ok = Test-Step -StepName $step.Name -Action $step.Action
-        if (-not $ok) {
-            $allPassed = $false
-            Write-Host "[Test] Stopping test sequence at step: $($step.Name)" -ForegroundColor Red
-            break
+        $name = $step.Name
+        $deps = $step.DependsOn
+        $canRun = $true
+        $failedDeps = @()
+        foreach ($dep in $deps) {
+            if ($stepStatus.ContainsKey($dep) -and -not $stepStatus[$dep]) {
+                $canRun = $false
+                $failedDeps += $dep
+            }
         }
-        # After each step, check status/health
-        if ($step.Name -in @('Start','Update','Restart','Rebuild')) {
-            Write-Host "[Test] Checking stack status after $($step.Name)..." -ForegroundColor Yellow
-            Write-Host ("[Debug] Invoking: pwsh -File $scriptPath status") -ForegroundColor Magenta
-            & pwsh -File $scriptPath status
+        Write-Host ("-- $name --") -ForegroundColor Yellow
+        if (@($deps).Count -gt 0) {
+            Write-Host ("[Info] Dependencies: {0}" -f ($deps -join ', ')) -ForegroundColor Gray
+        } else {
+            Write-Host "[Info] No dependencies." -ForegroundColor Gray
+        }
+        if ($canRun) {
+            $ok = Test-Step -StepName $name -Action $step.Action
+            $stepStatus[$name] = $ok
+            $stepResults[$name] = $ok
+            if (-not $ok) {
+                $allPassed = $false
+                Write-Host "[Test] $name FAILED." -ForegroundColor Red
+            }
+            if ($name -in @('Start','Update','Restart','Rebuild')) {
+                Write-Host "[Test] Checking stack status after $name..." -ForegroundColor Yellow
+                Show-Status
+            }
+        } else {
+            $stepStatus[$name] = $false
+            $stepResults[$name] = $false
+            Write-Host ("[Test] Skipping $name due to failed dependencies: {0}" -f ($failedDeps -join ', ')) -ForegroundColor Red
+        }
+    }
+    Write-Host '========== TEST SUMMARY ==========' -ForegroundColor Cyan
+    foreach ($step in $steps) {
+        $name = $step.Name
+        $ok = $stepResults[$name]
+        $color = if ($ok) { 'Green' } else { 'Red' }
+        Write-Host ("{0,-15} {1}" -f $name, ($(if ($ok) { 'PASS' } else { 'FAIL' }))) -ForegroundColor $color
+        if (@($step.DependsOn).Count -gt 0) {
+            Write-Host ("    Dependencies: {0}" -f ($step.DependsOn -join ', ')) -ForegroundColor Gray
         }
     }
     if ($allPassed) {
@@ -383,85 +764,55 @@ function Test-Stack-All {
 }
 switch ($Command) {
     'start' {
-        $cmdStart = Get-Date
-        Write-Host '[Command] Starting stack...' -ForegroundColor Cyan
-        Sync-Configs
-        Start-Stack
-        Write-Host '[Command] Stack start complete.' -ForegroundColor Green
-        $cmdEnd = Get-Date
-        Write-Host ("[Timing] Elapsed time for 'start': {0}" -f ($cmdEnd - $cmdStart)) -ForegroundColor Yellow
+        Invoke-TimedCommand -CommandName 'start' -StartMessage '[Command] Starting stack...' -DoneMessage '[Command] Stack start complete.' -Action {
+            $syncStatus = Sync-Configs
+            Start-Stack -SyncStatus $syncStatus
+            Show-ServiceEndpoints
+        }
     }
     'stop' {
-        $cmdStart = Get-Date
-        Write-Host '[Command] Stopping stack...' -ForegroundColor Cyan
-        Stop-Stack
-        Write-Host '[Command] Stack stop complete.' -ForegroundColor Green
-        $cmdEnd = Get-Date
-        Write-Host ("[Timing] Elapsed time for 'stop': {0}" -f ($cmdEnd - $cmdStart)) -ForegroundColor Yellow
+        Invoke-TimedCommand -CommandName 'stop' -StartMessage '[Command] Stopping stack...' -DoneMessage '[Command] Stack stop complete.' -Action {
+            Stop-Stack
+        }
     }
     'rebuild' {
-        $cmdStart = Get-Date
-        Ensure-Clean
-        Write-Host '[Command] Rebuilding stack (full reset)...' -ForegroundColor Cyan
-        Reset-Stack
-        Write-Host '[Command] Stack rebuild complete.' -ForegroundColor Green
-        $cmdEnd = Get-Date
-        Write-Host ("[Timing] Elapsed time for 'rebuild': {0}" -f ($cmdEnd - $cmdStart)) -ForegroundColor Yellow
+        Invoke-TimedCommand -CommandName 'rebuild' -StartMessage '[Command] Rebuilding stack (full reset)...' -DoneMessage '[Command] Stack rebuild complete.' -Action {
+            Invoke-StackClean
+            Reset-Stack
+        }
     }
     'update' {
-        $cmdStart = Get-Date
-        Start-Stack
-        Write-Host '[Command] Stack update complete.' -ForegroundColor Green
-        $cmdEnd = Get-Date
-        Write-Host ("[Timing] Elapsed time for 'update': {0}" -f ($cmdEnd - $cmdStart)) -ForegroundColor Yellow
+        Invoke-TimedCommand -CommandName 'update' -StartMessage '[Command] Updating stack images and services...' -DoneMessage '[Command] Stack update complete.' -Action {
+            Update-Images
+            $syncStatus = Sync-Configs
+            Start-Stack -SyncStatus $syncStatus
+        }
     }
     'status' {
-        $cmdStart = Get-Date
-        Write-Host '[Command] Showing stack status...' -ForegroundColor Cyan
-        Show-Status
-        Write-Host '[Command] Stack status shown.' -ForegroundColor Green
-        $cmdEnd = Get-Date
-        Write-Host ("[Timing] Elapsed time for 'status': {0}" -f ($cmdEnd - $cmdStart)) -ForegroundColor Yellow
+        Invoke-TimedCommand -CommandName 'status' -StartMessage '[Command] Showing stack status...' -DoneMessage '[Command] Stack status shown.' -Action {
+            Show-Status -VerboseAuth:$VerboseAuth
+        }
     }
     'logs' {
-        $cmdStart = Get-Date
-        Write-Host '[Command] Showing recent logs for all services...' -ForegroundColor Cyan
-        Show-Logs -Service $Service -Follow:$Follow
-        Write-Host '[Command] Logs shown.' -ForegroundColor Green
-        $cmdEnd = Get-Date
-        Write-Host ("[Timing] Elapsed time for 'logs': {0}" -f ($cmdEnd - $cmdStart)) -ForegroundColor Yellow
+        Invoke-TimedCommand -CommandName 'logs' -StartMessage '[Command] Showing recent logs...' -DoneMessage '[Command] Logs shown.' -Action {
+            Show-Logs -Service $Service -Follow:$Follow
+        }
     }
     'sync' {
-        $cmdStart = Get-Date
-        Write-Host '[Command] Syncing configs...' -ForegroundColor Cyan
-        Sync-Configs
-        Write-Host '[Command] Config sync complete.' -ForegroundColor Green
-        $cmdEnd = Get-Date
-        Write-Host ("[Timing] Elapsed time for 'sync': {0}" -f ($cmdEnd - $cmdStart)) -ForegroundColor Yellow
-    }
-    'rebuild' {
-        $cmdStart = Get-Date
-        Write-Host '[Command] Rebuilding stack (full reset)...' -ForegroundColor Cyan
-        Reset-Stack
-        Write-Host '[Command] Stack rebuild complete.' -ForegroundColor Green
-        $cmdEnd = Get-Date
-        Write-Host ("[Timing] Elapsed time for 'rebuild': {0}" -f ($cmdEnd - $cmdStart)) -ForegroundColor Yellow
+        Invoke-TimedCommand -CommandName 'sync' -StartMessage '[Command] Syncing configs...' -DoneMessage '[Command] Config sync complete.' -Action {
+            $null = Sync-Configs
+        }
     }
     'clean' {
-        $cmdStart = Get-Date
-        Write-Host '[Command] Cleaning up all stack containers, volumes, and Docker resources...' -ForegroundColor Cyan
-        Remove-StackWithVolumes
-        Clear-DockerUnused
-        Write-Host '[Command] Stack and Docker resources fully cleaned.' -ForegroundColor Green
-        $cmdEnd = Get-Date
-        Write-Host ("[Timing] Elapsed time for 'clean': {0}" -f ($cmdEnd - $cmdStart)) -ForegroundColor Yellow
+        Invoke-TimedCommand -CommandName 'clean' -StartMessage '[Command] Cleaning stack and unused Docker resources...' -DoneMessage '[Command] Stack and Docker resources fully cleaned.' -Action {
+            Remove-StackWithVolumes
+            Clear-DockerUnused
+        }
     }
     'test-all' {
-        $cmdStart = Get-Date
-        Write-Host '[Command] Running full stack command test sequence...' -ForegroundColor Cyan
-        Test-Stack-All
-        $cmdEnd = Get-Date
-        Write-Host ("[Timing] Elapsed time for 'test-all': {0}" -f ($cmdEnd - $cmdStart)) -ForegroundColor Yellow
+        Invoke-TimedCommand -CommandName 'test-all' -StartMessage '[Command] Running full stack command test sequence...' -DoneMessage '[Command] Stack command test sequence complete.' -Action {
+            Test-Stack-All
+        }
     }
     default {
         Write-Host "[Error] Unknown command: $Command" -ForegroundColor Red
