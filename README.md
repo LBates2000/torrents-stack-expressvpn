@@ -32,9 +32,8 @@ pwsh ./scripts/torrents-stack.ps1 start
 - `.env` is intentionally ignored by `.gitignore`; `.env.example` is the safe template to commit.
 - Sensitive values in this stack include `EXPRESSVPN_ACTIVATION_CODE`, `JACKETT_CFG_API_KEY`, and `JACKETT_CFG_OMDB_API_KEY`.
 - Sync and runtime scripts intentionally redact sensitive values in console logs (for example API keys and auth tokens).
-- Enable the local pre-commit guardrail once per clone: `git config core.hooksPath .githooks`.
-- The repo includes `.githooks/pre-commit` to block commits that stage `.env`.
-- CI also enforces this with `.github/workflows/prevent-env-tracking.yml`.
+- Enable the local repo-managed hook path once per clone with the setup documented in `CONTRIBUTING.md`.
+- The local hook and CI both block commits that stage `.env`.
 - Before committing, run `git status --short` and confirm `.env` is not listed.
 
 ## How it works
@@ -139,7 +138,7 @@ docker compose up --force-recreate -d
 - Container bind mount targets: `CONTAINER_CONFIGS_DIR`, `CONTAINER_DOWNLOADS_DIR`
 - ExpressVPN entrypoint script mount: `HOST_EXPRESSVPN_ENTRYPOINT_SCRIPT`
 - Container names: `EXPRESSVPN_CONTAINER_NAME`, `FLARESOLVERR_CONTAINER_NAME`, `JACKETT_CONTAINER_NAME`, `QBITTORRENT_CONTAINER_NAME`
-- Shared healthcheck defaults: `HEALTHCHECK_INTERVAL`, `HEALTHCHECK_TIMEOUT`, `HEALTHCHECK_RETRIES`, `HEALTHCHECK_START_PERIOD`
+- Shared healthcheck overrides: `HEALTHCHECK_INTERVAL`, `HEALTHCHECK_TIMEOUT`, `HEALTHCHECK_RETRIES`, `HEALTHCHECK_START_PERIOD`
 - If you customize container names, update any external scripts/automation that reference those container names directly.
 
 ### Jackett config via env
@@ -182,7 +181,7 @@ FLARESOLVERR_CONTAINER_NAME=flaresolverr-app
 JACKETT_CONTAINER_NAME=jackett-app
 QBITTORRENT_CONTAINER_NAME=qbittorrent-app
 HEALTHCHECK_INTERVAL=30s
-HEALTHCHECK_TIMEOUT=15s
+HEALTHCHECK_TIMEOUT=30s
 HEALTHCHECK_RETRIES=10
 HEALTHCHECK_START_PERIOD=45s
 ```
@@ -241,7 +240,7 @@ HEALTHCHECK_START_PERIOD=45s
 	- Command: `docker compose logs --tail=100 expressvpn`
 	- Expected: active ExpressVPN connection for the configured server/protocol
 - Emergency rollback
-	- Command: `git checkout v1.0.0; docker compose down; docker compose up -d`
+	- Command: `git checkout v1.0.4; docker compose down; docker compose up -d`
 	- Expected: stack returns to last tagged baseline
 
 ## Backup and restore
@@ -281,7 +280,7 @@ docker compose ps --format "table {{.Name}}\t{{.State}}\t{{.Health}}\t{{.Status}
 - Redirect-based healthchecks are intentional: `301`/`302` can still mean the web UI is up before login.
 
 ## Changelog
-- `v1.0.5` (compose: full env parity, parameterize container names/healthcheck/network; fix image-tag-drift indentation; improve drift issue triage layout): pending release
+- `v1.0.5` (compose: full env parity, parameterize container names/healthcheck/network; fix image-tag-drift indentation; improve drift issue triage layout): unreleased changes currently on `main`
 - `v1.0.4` (compose/docs: add `expressvpn` healthcheck and require `qbittorrent` to wait for `expressvpn` health): https://github.com/LBates2000/torrents-stack-expressvpn/releases/tag/v1.0.4
 - `v1.0.3` (ci: bump actions/checkout to v6): https://github.com/LBates2000/torrents-stack-expressvpn/releases/tag/v1.0.3
 - `v1.0.2` (docs: onboarding and Jackett redirect clarifications): https://github.com/LBates2000/torrents-stack-expressvpn/releases/tag/v1.0.2
