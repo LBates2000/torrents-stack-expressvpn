@@ -8,11 +8,6 @@ x-dns: &common-dns
     - ${DNS1:-8.8.8.8}
     - ${DNS2:-1.1.1.1}
 
-x-common-volumes: &common-volumes
-  volumes:
-    - ${HOST_CONFIGS_DIR:-./configs}:${CONTAINER_CONFIGS_DIR:-/config}
-    - ${HOST_DOWNLOADS_DIR:-./downloads}:${CONTAINER_DOWNLOADS_DIR:-/downloads}
-
 x-common-app-environment: &common-app-environment
   TZ: ${TZ:-Etc/UTC}
 
@@ -35,15 +30,6 @@ x-health: &common-health
   timeout: ${HEALTHCHECK_TIMEOUT:-30s}
   retries: ${HEALTHCHECK_RETRIES:-10}
   start_period: ${HEALTHCHECK_START_PERIOD:-180s}  # 3 minutes
-
-x-flaresolverr-healthcheck-test: &flaresolverr-healthcheck-test
-  ["CMD", "bash", "-c", "curl -sf http://localhost:8191 | grep -q '\"msg\".*\"FlareSolverr is ready!\"'"]
-
-x-jackett-healthcheck-test: &jackett-healthcheck-test
-  ["CMD", "bash", "-c", "curl -s -o /dev/null -w '%{http_code}' http://localhost:9117/ --max-time 10 | grep -qE '^(200|301|302)$'"]
-
-x-qbittorrent-healthcheck-test: &qbittorrent-healthcheck-test
-  ["CMD", "bash", "-c", "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/ --max-time 10 | grep -qE '^(200|302)$'"]
 
 x-depends-on-healthy: &depends-on-healthy
   condition: service_healthy

@@ -32,12 +32,6 @@ function Show-CommandUsage {
     }
 }
 
-# --- Utility: Diagnose all stack containers ---
-function Get-StackStatusReport {
-    # Placeholder for future stack status summary logic
-    Write-Host "[Diagnosis] Use Get-StackReport for full container status." -ForegroundColor Cyan
-}
-
 function Get-StackReport {
     $services = @('expressvpn','flaresolverr','jackett','qbittorrent')
     Write-Host "[Diagnosis] Full container status for all stack services:" -ForegroundColor Cyan
@@ -90,7 +84,6 @@ function Write-DebugLine {
 }
 
 Write-Host '========== torrents-stack.ps1 ==========' -ForegroundColor Yellow
-Write-Host '[Test] Script started.' -ForegroundColor Yellow
 
 # Show usage/help if required parameter is missing (for direct invocation)
 if (-not $PSBoundParameters.ContainsKey('Command') -or [string]::IsNullOrWhiteSpace($Command)) {

@@ -3,6 +3,17 @@ configs/
 downloads/
 backups/
 
+# Generated runtime logs and scratch outputs
+logs/*.log
+bootstrap-debug.log
+docker-pull-test.txt
+start-output.txt
+test-all-output.txt
+test-all-output-new.txt
+test-all-fixed.txt
+usage-metrics.log
+service-health-dashboard.md
+
 # Local environment overrides
 .env
 
