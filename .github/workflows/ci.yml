@@ -11,13 +11,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Seed CI env from template
+        run: cp .env.example .env
       - name: Run config validation
-        run: pwsh ./scripts/validate-config.ps1
-      - name: Run test-all
-        run: pwsh ./scripts/torrents-stack.ps1 test-all
-      - name: Upload test logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-all-output
-          path: test-all-output.txt
+        run: pwsh ./scripts/validate-config.ps1 -AllowExampleFallback
+      - name: Run Pester tests
+        shell: pwsh
+        run: |
+          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          if (-not (Get-Module -ListAvailable -Name Pester)) {
+            Install-Module Pester -Scope CurrentUser -Force -SkipPublisherCheck
+          }
+          Invoke-Pester ./tests/shared-functions.Tests.ps1

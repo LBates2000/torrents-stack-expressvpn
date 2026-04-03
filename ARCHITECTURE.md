@@ -24,12 +24,13 @@ graph TD
 - Run `pwsh ./scripts/validate-config.ps1` before starting the stack to check for missing/invalid configs.
 - Use `pwsh ./scripts/cleanup-orphans.ps1` to remove old logs and orphaned Docker resources.
 - Shared PowerShell path and `.env` resolution lives in `scripts/shared-functions.ps1`, so operational scripts follow the same host directory overrides.
+- Missing runtime configs under `configs/` are bootstrapped by the sync/startup flow, so validation focuses on env/template inputs rather than committed machine state.
 - All scripts support robust logging and error handling.
 
 # Troubleshooting
 
 - If a service is unhealthy, run the corresponding healthcheck script in `scripts/` for details.
-- For CI failures, check the uploaded `test-all-output.txt` artifact.
+- For CI failures, inspect the failing GitHub Actions step for config validation or Pester output.
 
 # Security
 
