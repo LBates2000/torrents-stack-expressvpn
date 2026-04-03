@@ -15,10 +15,19 @@ function Write-ProgressLine {
             return
         }
     } catch {
-        # Ignore console capability errors and fall back to normal output.
+        Write-Debug ("Progress redraw fallback: {0}" -f $_.Exception.Message)
     }
     if ($true) {
         Write-Host $Message -ForegroundColor $Color
+    }
+}
+
+function Invoke-SafeClearHost {
+    try {
+        Clear-Host
+    }
+    catch {
+        Write-Debug ("Clear-Host skipped: {0}" -f $_.Exception.Message)
     }
 }
 <#
@@ -55,7 +64,7 @@ function Protect-Secret {
 # Enhanced error handler
 function Write-ErrorRecord {
     param([string]$Context, [object]$ErrorObj)
-    Write-Log -Message "[$Context] $($ErrorObj.Exception.Message)" -Level ERROR
+    Write-StackLog -Message "[$Context] $($ErrorObj.Exception.Message)" -Level ERROR
     exit 1
 }
 
@@ -246,16 +255,19 @@ function Test-QbittorrentLogin {
         [Object]$Auth
     )
     $client = New-HttpClient
+    $passwordBstr = [IntPtr]::Zero
     try {
-        $securePassword = $null
+        $plainPassword = $null
         if ($Auth -is [System.Management.Automation.PSCredential]) {
-            $securePassword = $Auth.GetNetworkCredential().Password | ConvertTo-SecureString -AsPlainText -Force
+            $plainPassword = $Auth.GetNetworkCredential().Password
         } elseif ($Auth -is [System.Security.SecureString]) {
-            $securePassword = $Auth
+            $passwordBstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Auth)
+            $plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordBstr)
+        } elseif ($Auth -is [string]) {
+            $plainPassword = $Auth
         } else {
-            throw "Auth parameter must be a SecureString or PSCredential."
+            throw "Auth parameter must be a String, SecureString, or PSCredential."
         }
-        $plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword))
         $escapedUser = [uri]::EscapeDataString($Username)
         $escapedPass = [uri]::EscapeDataString($plainPassword)
         $payload = "username=$escapedUser&password=$escapedPass"
@@ -291,6 +303,9 @@ function Test-QbittorrentLogin {
         }
     }
     finally {
+        if ($passwordBstr -ne [IntPtr]::Zero) {
+            [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordBstr)
+        }
         $client.Dispose()
     }
 }
@@ -421,7 +436,7 @@ function Show-ProgressSnapshotTable {
         [TimeSpan]$Elapsed
     )
 
-    try { Clear-Host } catch {}
+    Invoke-SafeClearHost
     Write-Host ("[{0}] Elapsed: {1}" -f $Title, $Elapsed.ToString('hh\:mm\:ss')) -ForegroundColor Cyan
     Write-Host ("{0,-10} {1,-28} {2,-20} {3}" -f 'Kind', 'Identifier', 'Status', 'Detail') -ForegroundColor Yellow
     Write-Host ("{0,-10} {1,-28} {2,-20} {3}" -f '----', '----------', '------', '------') -ForegroundColor Yellow
@@ -482,7 +497,7 @@ function Show-DockerProgressTable {
                     Show-ProgressSnapshotTable -Rows $progressRows -Title ("Docker Progress: {0}" -f $Command) -Elapsed $elapsed
                 }
                 else {
-                    try { Clear-Host } catch {}
+                    Invoke-SafeClearHost
                     Write-Host ("[Docker Progress] $Command | Elapsed: {0}" -f $elapsed.ToString("hh\:mm\:ss")) -ForegroundColor Cyan
                     Write-Host 'Waiting for structured progress output...' -ForegroundColor Gray
                 }
@@ -559,7 +574,7 @@ function Show-CommandProgressTable {
                     Show-ProgressSnapshotTable -Rows $progressRows -Title ("Command Progress: {0}" -f $Command) -Elapsed $elapsed
                 }
                 else {
-                    try { Clear-Host } catch {}
+                    Invoke-SafeClearHost
                     Write-Host ("[Command Progress] $Command | Elapsed: {0}" -f $elapsed.ToString("hh\:mm\:ss")) -ForegroundColor Cyan
                     ($lines | Select-Object -Last 20) | ForEach-Object { Write-Host $_ }
                 }

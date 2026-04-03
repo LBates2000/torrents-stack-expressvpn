@@ -58,7 +58,7 @@ function Show-ServiceStatusTable {
         [hashtable]$serviceStatus,
         [string[]]$services
     )
-    try { Clear-Host } catch {}
+    Invoke-SafeClearHost
     Write-Host "[Health Poll] Service Statuses (updated: $(Get-Date -Format 'HH:mm:ss'))" -ForegroundColor Cyan
     Write-Host ("{0,-15} {1,-14} {2,-12}" -f 'Service','Container ID','Status') -ForegroundColor Yellow
     Write-Host ("{0,-15} {1,-14} {2,-12}" -f '-------','------------','------') -ForegroundColor Yellow
@@ -522,6 +522,7 @@ function Get-JackettApiKey {
                 }
             }
             catch {
+                Write-Verbose ("Unable to parse Jackett config at {0}: {1}" -f $jackettConfigPath, $_.Exception.Message)
             }
         }
     }
@@ -554,8 +555,7 @@ function Show-AuthChecks {
                 Write-Host "qBittorrent auth target: $qbitBaseUrl"
                 Write-Host 'qBittorrent auth username: admin'
             }
-            $secureQbitPassword = $qbitPassword | ConvertTo-SecureString -AsPlainText -Force
-            $qbitResult = Test-QbittorrentLogin -BaseUrl $qbitBaseUrl -Username 'admin' -Auth $secureQbitPassword
+            $qbitResult = Test-QbittorrentLogin -BaseUrl $qbitBaseUrl -Username 'admin' -Auth $qbitPassword
             if ($qbitResult.Ok) {
                 Write-Host $qbitResult.Message
             }

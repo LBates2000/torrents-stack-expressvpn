@@ -1,4 +1,4 @@
-function Write-Log {
+function Write-StackLog {
     param(
         [string]$Message,
         [ValidateSet('INFO','WARN','ERROR','DEBUG')][string]$Level = 'INFO',

@@ -22,7 +22,7 @@ if [ -n "$ps_lint_files" ]; then
   $results = @()
   foreach ($path in $paths) {
     if (Test-Path -LiteralPath $path) {
-      $results += @(Invoke-ScriptAnalyzer -Path $path -Severity Warning,Error)
+      $results += @(Invoke-ScriptAnalyzer -Path $path -Settings "./PSScriptAnalyzerSettings.psd1" -Severity Warning,Error)
     }
   }
 

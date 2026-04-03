@@ -27,7 +27,7 @@ Thanks for contributing to this project.
 - Do not commit real credentials, API keys, or VPN private keys.
 - Keep `.env` local; update `.env.example` when adding new variables.
 - Enable the local commit guardrail once per clone: `git config core.hooksPath .githooks`.
-- The repo pre-commit hook runs `PSScriptAnalyzer` on staged `.ps1` files, reports warnings, fails on analyzer errors, and blocks commits that stage `.env`.
+- The repo pre-commit hook runs `PSScriptAnalyzer` on staged `.ps1` files using `PSScriptAnalyzerSettings.psd1`, reports warnings, fails on analyzer errors, and blocks commits that stage `.env`.
 - CI also fails if `.env` is ever tracked by git.
 
 ## Documentation updates
