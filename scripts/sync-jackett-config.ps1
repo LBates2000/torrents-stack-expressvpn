@@ -1,5 +1,6 @@
 param(
-    [switch]$SkipRestart
+    [switch]$SkipRestart,
+    [switch]$EmitStatus
 )
 
 Set-StrictMode -Version Latest
@@ -66,17 +67,16 @@ function Convert-EnvValue {
     }
 }
 
-$repoRoot = Split-Path -Parent $PSScriptRoot
-$envPath = Join-Path $repoRoot '.env'
+$stackContext = Get-StackContext -ScriptRoot $PSScriptRoot
 
-if (-not (Test-Path -LiteralPath $envPath)) {
-    throw "Missing .env file at $envPath"
+if (-not (Test-Path -LiteralPath $stackContext.EnvPath)) {
+    throw "Missing .env file at $($stackContext.EnvPath)"
 }
 
-$envMap = Get-EnvMap -Path $envPath
-
-$configsRoot = Resolve-HostPath -RepoRoot $repoRoot -ConfiguredPath $envMap['HOST_CONFIGS_DIR'] -DefaultRelativePath './configs'
-$downloadsRoot = Resolve-HostPath -RepoRoot $repoRoot -ConfiguredPath $envMap['HOST_DOWNLOADS_DIR'] -DefaultRelativePath './downloads'
+$repoRoot = $stackContext.RepoRoot
+$envMap = $stackContext.EnvMap
+$configsRoot = $stackContext.ConfigsRoot
+$downloadsRoot = $stackContext.DownloadsRoot
 $jackettConfigDir = Join-Path $configsRoot 'Jackett'
 $configPath = Join-Path $jackettConfigDir 'ServerConfig.json'
 
@@ -138,12 +138,17 @@ if ($hasChanges) {
 }
 
 if ($hasChanges -and -not $SkipRestart) {
+    . "$PSScriptRoot/shared-functions.ps1"
     Push-Location $repoRoot
     try {
         $runningServices = @(docker compose ps --status running --services)
         if ($runningServices -contains 'jackett') {
-            docker compose stop jackett | Out-Host
-            docker compose start jackett | Out-Host
+            Write-ProgressLine 'Stopping jackett...' -Color Yellow
+            docker compose stop jackett | Out-Null
+            Write-ProgressLine 'Stopped jackett.  ' -Color Yellow
+            Write-ProgressLine 'Starting jackett...' -Color Yellow
+            docker compose start jackett | Out-Null
+            Write-ProgressLine 'Started jackett.   ' -Color Yellow
             Write-Host 'Restarted jackett to apply config changes'
         }
         else {
@@ -170,3 +175,7 @@ Write-Host "BlackholeDir=$($config['BlackholeDir'])"
 Write-Host 'OmdbApiKey=<redacted>'
 Write-Host "OmdbApiUrl=$($config['OmdbApiUrl'])"
 Write-Host "FlareSolverrUrl=$($config['FlareSolverrUrl'])"
+
+if ($EmitStatus) {
+    Write-Output ("SYNC_STATUS:jackett:{0}" -f $hasChanges.ToString().ToLowerInvariant())
+}

@@ -1,3 +1,26 @@
+# --- Console Progress Line Utility ---
+# Writes a message to the same console line, overwriting previous content.
+function Write-ProgressLine {
+    param(
+        [string]$Message,
+        [ConsoleColor]$Color = [ConsoleColor]::White
+    )
+    # Use single-line redraw when RawUI is available; otherwise fall back to plain writes.
+    try {
+        if ($Host.UI -and $Host.UI.RawUI) {
+            $null = $Host.UI.RawUI.CursorPosition
+            $esc = [char]27
+            Write-Host ("${esc}[2K" + $Message) -ForegroundColor $Color -NoNewline
+            Write-Host "`r" -NoNewline
+            return
+        }
+    } catch {
+        # Ignore console capability errors and fall back to normal output.
+    }
+    if ($true) {
+        Write-Host $Message -ForegroundColor $Color
+    }
+}
 <#
 .SYNOPSIS
     Shared utility functions used across all stack management scripts.
@@ -10,17 +33,34 @@
 
 Set-StrictMode -Version Latest
 
+# Import standardized logging function
+. "$PSScriptRoot/Write-Log.ps1"
+
+# Utility: Redact secrets in strings (for logs)
+function Protect-Secret {
+    param([string]$InputString)
+        $patterns = @(
+            'EXPRESSVPN_ACTIVATION_CODE=\w+',
+            'JACKETT_CFG_API_KEY=\w+',
+            'JACKETT_CFG_OMDB_API_KEY=\w+',
+            '[A-Za-z0-9]{32,}' # generic API key/token
+        )
+    $out = $InputString
+    foreach ($pat in $patterns) {
+        $out = $out -replace $pat, '[REDACTED]'
+    }
+    return $out
+}
+
+# Enhanced error handler
+function Write-ErrorRecord {
+    param([string]$Context, [object]$ErrorObj)
+    Write-Log -Message "[$Context] $($ErrorObj.Exception.Message)" -Level ERROR
+    exit 1
+}
+
 <#
 .SYNOPSIS
-    Parse .env file into a hashtable.
-
-.DESCRIPTION
-    Reads a .env file (or any key=value file) and returns a hashtable of
-    key-value pairs. Ignores blank lines and comments (lines starting with #).
-
-.PARAMETER Path
-    Path to the .env file. If the file doesn't exist, returns an empty hashtable.
-
 .EXAMPLE
     $envMap = Get-EnvMap -Path './.env'
     $value = $envMap['QBITTORRENT_WEBUI_PORT']
@@ -85,6 +125,31 @@ function Get-EnvOrDefault {
     }
 
     return $DefaultValue
+}
+
+function Get-StackContext {
+    param(
+        [string]$ScriptRoot = $PSScriptRoot
+    )
+
+    $repoRoot = Split-Path -Parent $ScriptRoot
+    $envPath = Join-Path $repoRoot '.env'
+    $envMap = Get-EnvMap -Path $envPath
+    $configsRoot = Resolve-HostPath -RepoRoot $repoRoot -ConfiguredPath $envMap['HOST_CONFIGS_DIR'] -DefaultRelativePath './configs'
+    $downloadsRoot = Resolve-HostPath -RepoRoot $repoRoot -ConfiguredPath $envMap['HOST_DOWNLOADS_DIR'] -DefaultRelativePath './downloads'
+
+    return [pscustomobject]@{
+        RepoRoot = $repoRoot
+        EnvPath = $envPath
+        EnvMap = $envMap
+        ConfigsRoot = $configsRoot
+        DownloadsRoot = $downloadsRoot
+        ContainerConfigsDir = Get-EnvOrDefault -EnvMap $envMap -Key 'CONTAINER_CONFIGS_DIR' -DefaultValue '/config'
+        ContainerDownloadsDir = Get-EnvOrDefault -EnvMap $envMap -Key 'CONTAINER_DOWNLOADS_DIR' -DefaultValue '/downloads'
+        QbittorrentWebUiPort = Get-EnvOrDefault -EnvMap $envMap -Key 'QBITTORRENT_WEBUI_PORT' -DefaultValue '8080'
+        JackettPort = Get-EnvOrDefault -EnvMap $envMap -Key 'JACKETT_PORT' -DefaultValue '9117'
+        FlareSolverrPort = Get-EnvOrDefault -EnvMap $envMap -Key 'FLARESOLVERR_PORT' -DefaultValue '8191'
+    }
 }
 
 <#
@@ -230,6 +295,53 @@ function Test-QbittorrentLogin {
     }
 }
 
+# --- Jackett API key check (shared) ---
+function Test-JackettApiKey {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$BaseUrl,
+        [Parameter(Mandatory=$true)]
+        [string]$ApiKey
+    )
+
+    $client = New-HttpClient
+    try {
+        $endpoint = "$BaseUrl/api/v2.0/indexers/all/results?apikey=$ApiKey&Query=test&Tracker[]=all"
+        $response = $client.GetAsync($endpoint).GetAwaiter().GetResult()
+        $body = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+
+        if ($response.IsSuccessStatusCode) {
+            return [pscustomobject]@{
+                Ok         = $true
+                Message    = 'Jackett API key check passed'
+                Endpoint   = $endpoint
+                StatusCode = [int]$response.StatusCode
+                Body       = $body
+            }
+        }
+
+        return [pscustomobject]@{
+            Ok         = $false
+            Message    = "Jackett API key check failed (status=$([int]$response.StatusCode))"
+            Endpoint   = $endpoint
+            StatusCode = [int]$response.StatusCode
+            Body       = $body
+        }
+    }
+    catch {
+        return [pscustomobject]@{
+            Ok         = $false
+            Message    = "Jackett API key check failed: $($_.Exception.Message)"
+            Endpoint   = "$BaseUrl/api/v2.0/indexers/all/results"
+            StatusCode = -1
+            Body       = ''
+        }
+    }
+    finally {
+        $client.Dispose()
+    }
+}
+
 <#+
 .SYNOPSIS
     Checks for the presence of Jackett plugin files in the qBittorrent container.
@@ -238,12 +350,17 @@ function Test-QbittorrentLogin {
     Prints status and returns $true if present, $false otherwise.
 #>
 function Test-QbittorrentJackettPlugin {
-    $runningServices = @(docker compose ps --services --filter status=running)
+    $runningServices = @(docker compose ps --services --filter status=running 2>$null)
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host 'Docker daemon unavailable; plugin check skipped.' -ForegroundColor Gray
+        return $null
+    }
+
     if ($runningServices -notcontains 'qbittorrent') {
         Write-Host 'qBittorrent is not running; plugin check skipped.'
         return $null
     }
-    $pluginCheck = docker compose exec -T qbittorrent sh -lc "if [ -s /config/qBittorrent/nova3/engines/jackett.py ] && [ -s /config/qBittorrent/nova3/engines/jackett.json ]; then echo OK; else echo MISSING; fi"
+    $pluginCheck = docker compose exec -T qbittorrent sh -lc "if [ -s /config/qBittorrent/nova3/engines/jackett.py ] && [ -s /config/qBittorrent/nova3/engines/jackett.json ]; then echo OK; else echo MISSING; fi" 2>$null
     if ($pluginCheck -contains 'OK') {
         Write-Host 'Jackett plugin files present: /config/qBittorrent/nova3/engines/jackett.py and jackett.json'
         return $true
@@ -251,5 +368,244 @@ function Test-QbittorrentJackettPlugin {
         Write-Warning 'Jackett plugin files missing in qBittorrent container (/config/qBittorrent/nova3/engines).'
         Write-Host 'Run: pwsh ./scripts/torrents-stack.ps1 restart'
         return $false
+    }
+}
+
+function Get-TerminalHyperlink {
+    param(
+        [string]$Text,
+        [string]$Url
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Text) -or [string]::IsNullOrWhiteSpace($Url)) {
+        return $Text
+    }
+
+    $esc = [char]27
+    return "${esc}]8;;$Url${esc}\$Text${esc}]8;;${esc}\"
+}
+
+function ConvertTo-ProgressRow {
+    param([string]$Line)
+
+    if ([string]::IsNullOrWhiteSpace($Line)) {
+        return $null
+    }
+
+    $trimmed = $Line.Trim()
+    if ($trimmed -match '^(?<kind>Image|Layer|Container|Network|Volume)\s+(?<id>\S+)\s+(?<status>.+?)\s*$') {
+        return [pscustomobject]@{
+            Kind   = $matches.kind
+            Id     = $matches.id
+            Status = $matches.status.Trim()
+            Detail = ''
+        }
+    }
+
+    if ($trimmed -match '^(?<id>[A-Za-z0-9][A-Za-z0-9._:/-]*)\s+(?<status>Pulling fs layer|Waiting|Downloading|Download complete|Extracting|Pull complete|Already exists|Mounted from|Verifying Checksum|Pushed|Layer already exists|Complete)(?<detail>.*)$') {
+        return [pscustomobject]@{
+            Kind   = 'Layer'
+            Id     = $matches.id
+            Status = $matches.status.Trim()
+            Detail = $matches.detail.Trim()
+        }
+    }
+
+    return $null
+}
+
+function Show-ProgressSnapshotTable {
+    param(
+        [System.Collections.Specialized.OrderedDictionary]$Rows,
+        [string]$Title,
+        [TimeSpan]$Elapsed
+    )
+
+    try { Clear-Host } catch {}
+    Write-Host ("[{0}] Elapsed: {1}" -f $Title, $Elapsed.ToString('hh\:mm\:ss')) -ForegroundColor Cyan
+    Write-Host ("{0,-10} {1,-28} {2,-20} {3}" -f 'Kind', 'Identifier', 'Status', 'Detail') -ForegroundColor Yellow
+    Write-Host ("{0,-10} {1,-28} {2,-20} {3}" -f '----', '----------', '------', '------') -ForegroundColor Yellow
+
+    foreach ($row in $Rows.Values) {
+        $color = switch -Regex ($row.Status) {
+            'healthy|started|created|complete|already exists|mounted from|pushed' { 'Green' }
+            'starting|creating|pulling|extracting|downloading|waiting|verifying' { 'Yellow' }
+            'unhealthy|error|failed|fatal' { 'Red' }
+            default { 'White' }
+        }
+        Write-Host ("{0,-10} {1,-28} {2,-20} {3}" -f $row.Kind, $row.Id, $row.Status, $row.Detail) -ForegroundColor $color
+    }
+
+    Write-Host ("`nTracked items: {0}" -f $Rows.Count) -ForegroundColor Gray
+}
+
+<#+
+.SYNOPSIS
+    Show Docker image pull progress as a dynamic table.
+.DESCRIPTION
+    Runs a docker pull or docker compose pull command, parses layer status, and displays a refreshing table.
+.PARAMETER Command
+    The docker command to run (default: 'docker compose pull').
+.EXAMPLE
+    Show-DockerPullProgress -Command 'docker compose pull'
+#>
+function Show-DockerProgressTable {
+    param(
+        [string]$Command = "docker compose pull"
+    )
+    $tmpFile = [System.IO.Path]::GetTempFileName()
+    $tmpErrFile = [System.IO.Path]::GetTempFileName()
+    $logDir = Join-Path $PSScriptRoot '..' 'logs'
+    if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
+    $logFile = Join-Path $logDir ("docker-progress-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + ".log")
+    $allProgressLines = @()
+    $progressRows = [ordered]@{}
+    try {
+        $proc = Start-Process -FilePath "pwsh" -ArgumentList "-NoProfile", "-Command", $Command -RedirectStandardOutput $tmpFile -RedirectStandardError $tmpErrFile -NoNewWindow -PassThru
+        $startTime = Get-Date
+        while (-not $proc.HasExited) {
+            Start-Sleep -Milliseconds 500
+            if ((Test-Path $tmpFile) -or (Test-Path $tmpErrFile)) {
+                $stdoutLines = if (Test-Path $tmpFile) { @(Get-Content $tmpFile) } else { @() }
+                $stderrLines = if (Test-Path $tmpErrFile) { @(Get-Content $tmpErrFile) } else { @() }
+                $lines = @($stdoutLines + $stderrLines)
+                $allProgressLines += $lines
+                foreach ($line in $lines) {
+                    $progressRow = ConvertTo-ProgressRow -Line $line
+                    if ($null -ne $progressRow) {
+                        $key = "{0}:{1}" -f $progressRow.Kind, $progressRow.Id
+                        $progressRows[$key] = $progressRow
+                    }
+                }
+                $elapsed = (Get-Date) - $startTime
+                if ($progressRows.Count -gt 0) {
+                    Show-ProgressSnapshotTable -Rows $progressRows -Title ("Docker Progress: {0}" -f $Command) -Elapsed $elapsed
+                }
+                else {
+                    try { Clear-Host } catch {}
+                    Write-Host ("[Docker Progress] $Command | Elapsed: {0}" -f $elapsed.ToString("hh\:mm\:ss")) -ForegroundColor Cyan
+                    Write-Host 'Waiting for structured progress output...' -ForegroundColor Gray
+                }
+            }
+        }
+        # Print any remaining output
+        $stdoutLines = if (Test-Path $tmpFile) { @(Get-Content $tmpFile) } else { @() }
+        $stderrLines = if (Test-Path $tmpErrFile) { @(Get-Content $tmpErrFile) } else { @() }
+        $lines = @($stdoutLines + $stderrLines)
+        $allProgressLines += $lines
+        foreach ($line in $lines) {
+            $progressRow = ConvertTo-ProgressRow -Line $line
+            if ($null -ne $progressRow) {
+                $key = "{0}:{1}" -f $progressRow.Kind, $progressRow.Id
+                $progressRows[$key] = $progressRow
+            }
+        }
+        $proc.WaitForExit()
+        # Write all progress lines to log file
+        $allProgressLines | Set-Content $logFile
+        # Final summary
+        $elapsed = (Get-Date) - $startTime
+        if ($progressRows.Count -gt 0) {
+            Show-ProgressSnapshotTable -Rows $progressRows -Title ("Docker Progress: {0}" -f $Command) -Elapsed $elapsed
+        }
+        Write-Host ("`n[Docker Progress Complete] {0}" -f $Command) -ForegroundColor Cyan
+        Write-Host ("Elapsed time: {0}" -f $elapsed.ToString("hh\:mm\:ss")) -ForegroundColor Yellow
+        Write-Host ("Progress log saved to: {0}" -f $logFile) -ForegroundColor Gray
+    } finally {
+        if (Test-Path $tmpFile) { Remove-Item $tmpFile -Force }
+        if (Test-Path $tmpErrFile) { Remove-Item $tmpErrFile -Force }
+    }
+}
+
+# Alias for backward compatibility
+function Show-DockerPullProgress {
+    param([string]$Command = "docker compose pull")
+    Show-DockerProgressTable -Command $Command
+}
+
+# Show-CommandProgressTable: Generic live progress for any long-running command
+function Show-CommandProgressTable {
+    param(
+        [string]$Command,
+        [string]$LogPrefix = "command-progress"
+    )
+    $tmpFile = [System.IO.Path]::GetTempFileName()
+    $tmpErrFile = [System.IO.Path]::GetTempFileName()
+    $logDir = Join-Path $PSScriptRoot '..' 'logs'
+    if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
+    $logFile = Join-Path $logDir ("${LogPrefix}-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + ".log")
+    $allLines = @()
+    $progressRows = [ordered]@{}
+    $startTime = Get-Date
+    try {
+        $proc = Start-Process -FilePath "pwsh" -ArgumentList "-NoProfile", "-Command", $Command -RedirectStandardOutput $tmpFile -RedirectStandardError $tmpErrFile -NoNewWindow -PassThru
+        $lastLine = 0
+        while (-not $proc.HasExited) {
+            Start-Sleep -Milliseconds 500
+            if ((Test-Path $tmpFile) -or (Test-Path $tmpErrFile)) {
+                $stdoutLines = if (Test-Path $tmpFile) { @(Get-Content $tmpFile) } else { @() }
+                $stderrLines = if (Test-Path $tmpErrFile) { @(Get-Content $tmpErrFile) } else { @() }
+                $lines = @($stdoutLines + $stderrLines)
+                $allLines += $lines
+                foreach ($line in $lines) {
+                    $progressRow = ConvertTo-ProgressRow -Line $line
+                    if ($null -ne $progressRow) {
+                        $key = "{0}:{1}" -f $progressRow.Kind, $progressRow.Id
+                        $progressRows[$key] = $progressRow
+                    }
+                }
+                $elapsed = (Get-Date) - $startTime
+                if ($progressRows.Count -gt 0) {
+                    Show-ProgressSnapshotTable -Rows $progressRows -Title ("Command Progress: {0}" -f $Command) -Elapsed $elapsed
+                }
+                else {
+                    try { Clear-Host } catch {}
+                    Write-Host ("[Command Progress] $Command | Elapsed: {0}" -f $elapsed.ToString("hh\:mm\:ss")) -ForegroundColor Cyan
+                    ($lines | Select-Object -Last 20) | ForEach-Object { Write-Host $_ }
+                }
+                $lastLine = ($lines | Measure-Object).Count
+            }
+        }
+        # Print any remaining output
+        $stdoutLines = if (Test-Path $tmpFile) { @(Get-Content $tmpFile) } else { @() }
+        $stderrLines = if (Test-Path $tmpErrFile) { @(Get-Content $tmpErrFile) } else { @() }
+        $lines = @($stdoutLines + $stderrLines)
+        if ($lines.Count -gt 0) {
+            $left = $lines | Select-Object -Skip $lastLine
+            foreach ($line in $left) { Write-Host $line }
+            $allLines += $lines
+            foreach ($line in $lines) {
+                $progressRow = ConvertTo-ProgressRow -Line $line
+                if ($null -ne $progressRow) {
+                    $key = "{0}:{1}" -f $progressRow.Kind, $progressRow.Id
+                    $progressRows[$key] = $progressRow
+                }
+            }
+        }
+        $proc.WaitForExit()
+        # Write all lines to log file
+        $allLines | Set-Content $logFile
+        $elapsed = (Get-Date) - $startTime
+        if ($progressRows.Count -gt 0) {
+            Show-ProgressSnapshotTable -Rows $progressRows -Title ("Command Progress: {0}" -f $Command) -Elapsed $elapsed
+        }
+        Write-Host ("`n[Command Complete] {0}" -f $Command) -ForegroundColor Cyan
+        Write-Host ("Elapsed time: {0}" -f $elapsed.ToString("hh\:mm\:ss")) -ForegroundColor Yellow
+        Write-Host ("Progress log saved to: {0}" -f $logFile) -ForegroundColor Gray
+    } finally {
+        if (Test-Path $tmpFile) {
+            try {
+                Remove-Item $tmpFile -Force -ErrorAction Stop
+            } catch {
+                Write-Host ("[Warning] Could not remove temp file: {0}" -f $tmpFile) -ForegroundColor Yellow
+            }
+        }
+        if (Test-Path $tmpErrFile) {
+            try {
+                Remove-Item $tmpErrFile -Force -ErrorAction Stop
+            } catch {
+                Write-Host ("[Warning] Could not remove temp file: {0}" -f $tmpErrFile) -ForegroundColor Yellow
+            }
+        }
     }
 }

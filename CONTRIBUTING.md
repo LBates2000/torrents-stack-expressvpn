@@ -28,6 +28,8 @@ Thanks for contributing to this project.
 - CI also fails if `.env` is ever tracked by git.
 
 ## Documentation updates
+- Keep command behavior descriptions in `scripts/torrents-stack.ps1` usage/help output.
+- In `README.md`, reference script usage/help instead of duplicating per-command behavior text.
 - Update `README.md` for any behavior, healthcheck, or command changes.
 - Keep operational instructions concise and copy/paste ready.
 

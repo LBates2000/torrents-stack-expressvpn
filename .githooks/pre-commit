@@ -2,6 +2,19 @@
 
 set -eu
 
+# PowerShell linting
+if command -v pwsh >/dev/null 2>&1; then
+  pwsh -Command "if (Get-Command Invoke-ScriptAnalyzer -ErrorAction SilentlyContinue) { Invoke-ScriptAnalyzer -Path ./scripts/*.ps1 -Recurse -Severity Warning,Error } else { Write-Host 'PSScriptAnalyzer not installed.' }"
+fi
+
+# Shell script linting
+if command -v shellcheck >/dev/null 2>&1; then
+  shellcheck ./scripts/*.sh
+fi
+if command -v shfmt >/dev/null 2>&1; then
+  shfmt -d ./scripts/*.sh
+fi
+
 if git diff --cached --name-only | grep -Eq '(^|/)\.env$'; then
   echo "ERROR: .env is staged. This file contains local secrets and must not be committed."
   echo "Run: git restore --staged .env"

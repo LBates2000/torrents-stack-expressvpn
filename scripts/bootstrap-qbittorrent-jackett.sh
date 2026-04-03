@@ -1,60 +1,48 @@
 #!/usr/bin/env bash
 
-set -uo pipefail
+
+set -euo pipefail
 
 QBITTORRENT_CONF="/config/qBittorrent.conf"
-if [ -n "${QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT:-}" ]; then
-  echo "[qbittorrent-bootstrap] Attempting to set WebUI password hash from QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT..."
-  ENGINES_DIR="${QBITTORRENT_ENGINES_DIR:-/config/qBittorrent/nova3/engines}"
-  TMP_PY_SCRIPT="/tmp/qb_webui_hash.py"
-  cat > "$TMP_PY_SCRIPT" <<'EOF'
-import os, base64, hashlib
-password = os.environ.get('QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT')
-assert password, 'No password in env'
-salt = os.urandom(16)
-dk = hashlib.pbkdf2_hmac('sha1', password.encode('utf-8'), salt, 100000, dklen=32)
-out = b'@ByteArray(' + base64.b64encode(salt + dk) + b')'
-print('WebUI\\Password_ha1=' + out.decode())
-EOF
-  HASH_LINE=$(python3 "$TMP_PY_SCRIPT")
-  rm -f "$TMP_PY_SCRIPT"
-  CONFIG_PATH="${ENGINES_DIR}/jackett.json"
-  JACKETT_CONFIG_PATH="${JACKETT_CONFIG_PATH:-/config/Jackett/ServerConfig.json}"
-  JACKETT_PLUGIN_URL="${QBITTORRENT_JACKETT_PLUGIN_URL:-https://raw.githubusercontent.com/qbittorrent/search-plugins/fa0be6abdc47b8622e8ec71a0d4427d9a7770eab/nova3/engines/jackett.py}"
-  JACKETT_URL="${QBITTORRENT_JACKETT_URL:-http://jackett:9117}"
-  THREAD_COUNT="${QBITTORRENT_JACKETT_THREAD_COUNT:-20}"
-  TRACKER_FIRST="${QBITTORRENT_JACKETT_TRACKER_FIRST:-false}"
+ENGINES_DIR="${QBITTORRENT_ENGINES_DIR:-/config/qBittorrent/nova3/engines}"
+PLUGIN_PATH="${ENGINES_DIR}/jackett.py"
+CONFIG_PATH="${ENGINES_DIR}/jackett.json"
+JACKETT_CONFIG_PATH="${JACKETT_CONFIG_PATH:-/config/Jackett/ServerConfig.json}"
+JACKETT_PLUGIN_URL="${QBITTORRENT_JACKETT_PLUGIN_URL:-https://raw.githubusercontent.com/qbittorrent/search-plugins/fa0be6abdc47b8622e8ec71a0d4427d9a7770eab/nova3/engines/jackett.py}"
+JACKETT_URL="${QBITTORRENT_JACKETT_URL:-http://jackett:9117}"
+THREAD_COUNT="${QBITTORRENT_JACKETT_THREAD_COUNT:-20}"
+TRACKER_FIRST="${QBITTORRENT_JACKETT_TRACKER_FIRST:-false}"
 
-  mkdir -p "${ENGINES_DIR}"
-  mkdir -p "${ENGINES_DIR}"
-  # Define PLUGIN_PATH for jackett.py plugin
-  PLUGIN_PATH="${ENGINES_DIR}/jackett.py"
-fi
+mkdir -p "${ENGINES_DIR}"
 
 # Download Jackett plugin if missing
 if [ ! -s "${PLUGIN_PATH}" ]; then
   if command -v wget >/dev/null 2>&1; then
-    if wget -q -O "${PLUGIN_PATH}" "${JACKETT_PLUGIN_URL}"; then
-      echo "[qbittorrent-bootstrap] Installed jackett.py search plugin"
-    else
-      echo "[qbittorrent-bootstrap] WARN: Failed to download jackett.py via wget"
+    if ! timeout 30 wget -q -O "${PLUGIN_PATH}" "${JACKETT_PLUGIN_URL}"; then
+      echo "[qbittorrent-bootstrap] WARN: Failed to download jackett.py via wget (timeout or error)"
       rm -f "${PLUGIN_PATH}" || true
+    else
+      echo "[qbittorrent-bootstrap] Installed jackett.py search plugin"
     fi
   elif command -v python3 >/dev/null 2>&1; then
-    if python3 - "${JACKETT_PLUGIN_URL}" "${PLUGIN_PATH}" <<'PY'
+    if ! python3 - "${JACKETT_PLUGIN_URL}" "${PLUGIN_PATH}" <<'PY'
 import sys
 from urllib.request import urlopen
+import socket
 url, dest = sys.argv[1], sys.argv[2]
-with urlopen(url, timeout=20) as response:
-    content = response.read()
-with open(dest, 'wb') as fh:
-    fh.write(content)
+try:
+    with urlopen(url, timeout=30) as response:
+        content = response.read()
+    with open(dest, 'wb') as fh:
+        fh.write(content)
+except (socket.timeout, Exception) as e:
+    sys.exit(1)
 PY
     then
-      echo "[qbittorrent-bootstrap] Installed jackett.py search plugin"
-    else
-      echo "[qbittorrent-bootstrap] WARN: Failed to download jackett.py via python3"
+      echo "[qbittorrent-bootstrap] WARN: Failed to download jackett.py via python3 (timeout or error)"
       rm -f "${PLUGIN_PATH}" || true
+    else
+      echo "[qbittorrent-bootstrap] Installed jackett.py search plugin"
     fi
   else
     echo "[qbittorrent-bootstrap] WARN: Neither wget nor python3 available; cannot auto-install jackett.py"
@@ -97,40 +85,12 @@ else
     "url": "${JACKETT_URL}"
 }
 EOF
+
   echo "[qbittorrent-bootstrap] Wrote jackett.json with API key and service URL"
-  # Also write QBITTORRENT_JACKETT_API_KEY to /config/qBittorrent.conf for healthcheck compatibility
-  QBITTORRENT_CONF="/config/qBittorrent.conf"
-  if [ -n "$JACKETT_API_KEY" ]; then
-    if grep -q '^QBITTORRENT_JACKETT_API_KEY=' "$QBITTORRENT_CONF" 2>/dev/null; then
-      # Update existing line
-      sed -i "s|^QBITTORRENT_JACKETT_API_KEY=.*$|QBITTORRENT_JACKETT_API_KEY=$JACKETT_API_KEY|" "$QBITTORRENT_CONF"
-    else
-      # Append if not present
-      echo "QBITTORRENT_JACKETT_API_KEY=$JACKETT_API_KEY" >> "$QBITTORRENT_CONF"
-    fi
-    echo "[qbittorrent-bootstrap] Synced QBITTORRENT_JACKETT_API_KEY to $QBITTORRENT_CONF"
-  fi
-fi
 
-cat > "${CONFIG_PATH}" <<EOF
-{
-    "api_key": "${JACKETT_API_KEY}",
-    "thread_count": ${THREAD_COUNT},
-    "tracker_first": ${TRACKER_FIRST},
-    "url": "${JACKETT_URL}"
-}
-EOF
-
-echo "[qbittorrent-bootstrap] Wrote jackett.json with API key and service URL"
-
-# Also write QBITTORRENT_JACKETT_API_KEY to /config/qBittorrent.conf for healthcheck compatibility
-QBITTORRENT_CONF="/config/qBittorrent.conf"
-if [ -n "$JACKETT_API_KEY" ]; then
   if grep -q '^QBITTORRENT_JACKETT_API_KEY=' "$QBITTORRENT_CONF" 2>/dev/null; then
-    # Update existing line
     sed -i "s|^QBITTORRENT_JACKETT_API_KEY=.*$|QBITTORRENT_JACKETT_API_KEY=$JACKETT_API_KEY|" "$QBITTORRENT_CONF"
   else
-    # Append if not present
     echo "QBITTORRENT_JACKETT_API_KEY=$JACKETT_API_KEY" >> "$QBITTORRENT_CONF"
   fi
   echo "[qbittorrent-bootstrap] Synced QBITTORRENT_JACKETT_API_KEY to $QBITTORRENT_CONF"
@@ -171,5 +131,5 @@ EOF
     echo "[qbittorrent-bootstrap] WARN: python3 not available, cannot set WebUI password hash from QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT"
   fi
 else
-  echo "[qbittorrent-bootstrap] QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT not set or empty, skipping WebUI password hash."
+  echo "[qbittorrent-bootstrap] QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT not set or empty inside the container, skipping WebUI password hash."
 fi

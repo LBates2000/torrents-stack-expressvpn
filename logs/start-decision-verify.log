@@ -1,0 +1,1525 @@
+========== torrents-stack.ps1 ==========
+[Test] Script started.
+[Command] Starting stack...
+[Step] Syncing configs...
+[Step] Bringing stack up...
+[Decision] expressvpn refresh not needed: running env already matches .env.
+[Docker Progress] docker compose pull | Elapsed: 00:00:00
+Waiting for structured progress output...
+[Docker Progress] docker compose pull | Elapsed: 00:00:01
+Waiting for structured progress output...
+[Docker Progress] docker compose pull | Elapsed: 00:00:01
+Waiting for structured progress output...
+[Docker Progress: docker compose pull] Elapsed: 00:00:02
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulling              
+Image      lscr.io/linuxserver/qbittorrent:latest Pulling              
+
+Tracked items: 2
+[Docker Progress: docker compose pull] Elapsed: 00:00:03
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulling              
+Image      lscr.io/linuxserver/qbittorrent:latest Pulling              
+Image      polkaned/expressvpn:latest   Pulling              
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+
+Tracked items: 4
+[Docker Progress: docker compose pull] Elapsed: 00:00:04
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulling              
+Image      lscr.io/linuxserver/qbittorrent:latest Pulling              
+Image      polkaned/expressvpn:latest   Pulling              
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+
+Tracked items: 4
+[Docker Progress: docker compose pull] Elapsed: 00:00:06
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulling              
+Image      lscr.io/linuxserver/qbittorrent:latest Pulling              
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+
+Tracked items: 4
+[Docker Progress: docker compose pull] Elapsed: 00:00:08
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+
+Tracked items: 4
+[Docker Progress: docker compose pull] Elapsed: 00:00:09
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Pulling fs layer     0B
+Layer      9a0de5ed5705                 Pulling fs layer     0B
+
+Tracked items: 6
+[Docker Progress: docker compose pull] Elapsed: 00:00:10
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Downloading          908B
+Layer      9a0de5ed5705                 Pulling fs layer     0B
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Downloading          1.049MB
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:11
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          2.097MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:12
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          4.194MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:14
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          6.291MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:16
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          8.389MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:18
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          10.49MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:19
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          12.58MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:20
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          14.13MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:21
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          15.73MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:23
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          17.83MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:26
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          19.92MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:26
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          22.02MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:28
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          23.07MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:28
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          24.12MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:31
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          27.26MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:33
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          29.36MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:39
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          31.46MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:43
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          34.6MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:45
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          37.75MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:46
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          38.8MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:47
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          41.94MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:49
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          44.04MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:50
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          45.09MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:51
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          46.14MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:52
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          49.28MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:53
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          50.33MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:55
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          52.43MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:56
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          54.53MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:57
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          57.67MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:00:58
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          57.67MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:01:00
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          59.77MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:01:01
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          61.87MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:01:02
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          63.26MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:01:03
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          65.01MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:01:05
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Downloading          67.11MB
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:01:06
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Extracting           1B
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:01:06
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Extracting           2B
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:01:07
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Extracting           2B
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:01:09
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Extracting           4B
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:01:10
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Extracting           5B
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:01:11
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Extracting           6B
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:01:12
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Extracting           7B
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:01:13
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Extracting           8B
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:01:14
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Extracting           9B
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:01:14
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Extracting           10B
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:01:16
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulling              
+Layer      dfc40bad4ad3                 Download complete    0B
+Layer      9a0de5ed5705                 Extracting           10B
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:01:17
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulled               
+Layer      dfc40bad4ad3                 Pull complete        0B
+Layer      9a0de5ed5705                 Pull complete        0B
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+[Docker Progress: docker compose pull] Elapsed: 00:01:18
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Image      ghcr.io/flaresolverr/flaresolverr:latest Pulled               
+Image      lscr.io/linuxserver/qbittorrent:latest Pulled               
+Image      polkaned/expressvpn:latest   Pulled               
+Image      lscr.io/linuxserver/jackett:latest Pulled               
+Layer      dfc40bad4ad3                 Pull complete        0B
+Layer      9a0de5ed5705                 Pull complete        0B
+Layer      33a4dc9a25e8                 Download complete    0B
+Layer      75925ae93435                 Download complete    0B
+
+Tracked items: 8
+
+[Docker Progress Complete] docker compose pull
+Elapsed time: 00:01:18
+Progress log saved to: C:\Users\lbates\GitHub\torrents-stack-expressvpn\scripts\..\logs\docker-progress-20260402-001243.log
+[Command Progress] docker compose up -d | Elapsed: 00:00:00
+[Command Progress] docker compose up -d | Elapsed: 00:00:01
+[Command Progress] docker compose up -d | Elapsed: 00:00:02
+[Command Progress] docker compose up -d | Elapsed: 00:00:02
+[Command Progress] docker compose up -d | Elapsed: 00:00:03
+[Command Progress: docker compose up -d] Elapsed: 00:00:04
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Running              
+Container  expressvpn                   Running              
+Container  jackett                      Recreate             
+
+Tracked items: 3
+[Command Progress: docker compose up -d] Elapsed: 00:00:04
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Running              
+Container  expressvpn                   Running              
+Container  jackett                      Recreate             
+
+Tracked items: 3
+[Command Progress: docker compose up -d] Elapsed: 00:00:05
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Running              
+Container  expressvpn                   Running              
+Container  jackett                      Recreate             
+
+Tracked items: 3
+[Command Progress: docker compose up -d] Elapsed: 00:00:06
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Running              
+Container  expressvpn                   Running              
+Container  jackett                      Recreate             
+
+Tracked items: 3
+[Command Progress: docker compose up -d] Elapsed: 00:00:07
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Running              
+Container  expressvpn                   Running              
+Container  jackett                      Recreate             
+
+Tracked items: 3
+[Command Progress: docker compose up -d] Elapsed: 00:00:07
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Running              
+Container  expressvpn                   Running              
+Container  jackett                      Recreate             
+
+Tracked items: 3
+[Command Progress: docker compose up -d] Elapsed: 00:00:08
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Running              
+Container  expressvpn                   Running              
+Container  jackett                      Recreate             
+
+Tracked items: 3
+[Command Progress: docker compose up -d] Elapsed: 00:00:09
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Running              
+Container  expressvpn                   Running              
+Container  jackett                      Recreate             
+
+Tracked items: 3
+[Command Progress: docker compose up -d] Elapsed: 00:00:10
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Running              
+Container  expressvpn                   Running              
+Container  jackett                      Recreated            
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:11
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Waiting              
+Container  expressvpn                   Running              
+Container  jackett                      Recreated            
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:11
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Running              
+Container  jackett                      Starting             
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:12
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Running              
+Container  jackett                      Starting             
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:13
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Waiting              
+Container  expressvpn                   Waiting              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:14
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:14
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:15
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:16
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:16
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:17
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:18
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:19
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:19
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:20
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:21
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:22
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:23
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:23
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:24
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:25
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:26
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:26
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:27
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:28
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:29
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:30
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:30
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:31
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:32
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:33
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:33
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:34
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:35
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:36
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:37
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:37
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:38
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:39
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:41
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:41
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:42
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:43
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:44
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:45
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:45
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:46
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:47
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:48
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:48
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:50
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:52
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:52
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:53
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:54
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:55
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:56
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:56
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:57
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:00:59
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:01:00
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:01:01
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:01:02
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:01:02
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:01:03
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:01:04
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:01:05
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:01:05
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:01:06
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:01:07
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:01:08
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:01:08
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:01:09
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:01:11
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:01:12
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Waiting              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:01:12
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Healthy              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+[Command Progress: docker compose up -d] Elapsed: 00:01:13
+Kind       Identifier                   Status               Detail
+----       ----------                   ------               ------
+Container  flaresolverr                 Healthy              
+Container  expressvpn                   Healthy              
+Container  jackett                      Healthy              
+Container  qbittorrent                  Running              
+
+Tracked items: 4
+
+[Command Complete] docker compose up -d
+Elapsed time: 00:01:13
+Progress log saved to: C:\Users\lbates\GitHub\torrents-stack-expressvpn\scripts\..\logs\docker-up-20260402-001402.log
+[Decision] expressvpn recreate skipped.
+[Decision] jackett restart not needed: synced config did not change.
+[Decision] qbittorrent restart not needed: synced config did not change.
+[Health Poll] Service Statuses (updated: 00:15:16)
+Service         Container ID   Status      
+-------         ------------   ------      
+expressvpn      052c00bfc1bf   healthy     
+flaresolverr    de8e264a83e9   healthy     
+jackett         df026a87bcb5   healthy     
+qbittorrent     7a650fb7bfe1   healthy     
+
+[Status] Stack status:
+NAME           IMAGE                                      COMMAND                  SERVICE        CREATED              STATUS                        PORTS
+expressvpn     polkaned/expressvpn:latest                 "/bin/bash /tmp/entrΓÇª"   expressvpn     22 hours ago         Up 22 hours (healthy)         0.0.0.0:6881->6881/tcp, [::]:6881->6881/tcp, 0.0.0.0:8080->8080/tcp, 0.0.0.0:6881->6881/udp, [::]:8080->8080/tcp, [::]:6881->6881/udp
+flaresolverr   ghcr.io/flaresolverr/flaresolverr:latest   "/usr/bin/dumb-init ΓÇª"   flaresolverr   22 hours ago         Up 22 hours (healthy)         0.0.0.0:8191->8191/tcp, [::]:8191->8191/tcp
+jackett        lscr.io/linuxserver/jackett:latest         "/init"                  jackett        About a minute ago   Up About a minute (healthy)   0.0.0.0:9117->9117/tcp, [::]:9117->9117/tcp
+qbittorrent    lscr.io/linuxserver/qbittorrent:latest     "/init /bin/bash -c ΓÇª"   qbittorrent    22 hours ago         Up 22 hours (healthy)         
+
+[Logs] Recent jackett logs:
+jackett  | [custom-init] No custom files found, skipping...
+jackett  | 04-02 00:14:30 Info Starting Jackett v0.24.1526
+jackett  | 04-02 00:14:34 Info Environment version: 9.0.14 (/app/Jackett/)
+jackett  | 04-02 00:14:34 Info OS version: Unix 6.6.114.1 (64bit OS) (64bit process)
+jackett  | 04-02 00:14:34 Info Jackett variant: CoreLinuxMuslAmdx64
+jackett  | 04-02 00:14:34 Info File /etc/issue: Welcome to Alpine Linux 3.22
+jackett  | 04-02 00:14:34 Info Running in Docker: Yes (image build: v0.24.1526-ls362)
+jackett  | 04-02 00:14:34 Info ThreadPool MaxThreads: 32767 workerThreads, 1000 completionPortThreads
+jackett  | 04-02 00:14:34 Info App config/log directory: /config/Jackett
+jackett  | 04-02 00:14:35 Info Using proxy: Disabled
+jackett  | 04-02 00:14:35 Info Using FlareSolverr: http://flaresolverr:8191
+jackett  | 04-02 00:14:35 Info Using HTTP Client: HttpWebClient2
+jackett  | 04-02 00:14:35 Info Loading Native indexers ...
+jackett  | 04-02 00:14:35 Info Loaded 69 Native indexers.
+jackett  | 04-02 00:14:35 Info Loading Cardigann indexers from: /config/cardigann/definitions/, /etc/xdg/cardigan/definitions/, /app/Jackett/Definitions
+jackett  | 04-02 00:14:57 Info Loaded 548 Cardigann indexers.
+jackett  | 04-02 00:14:58 Info Loaded 617 indexers in total
+jackett  | 04-02 00:15:06 Info Adding aggregate indexer ('all' indexer) ...
+jackett  | 04-02 00:15:06 Info Adding filter indexer ('type:public' indexer) ...
+jackett  | 04-02 00:15:06 Info Adding filter indexer ('type:private' indexer) ...
+jackett  | 04-02 00:15:06 Info Adding filter indexer ('type:semi-public' indexer) ...
+jackett  | 04-02 00:15:07 Info Removing old configuration file: /config/Jackett/Indexers/bitsearch.json
+jackett  | 04-02 00:15:07 Info Removing old configuration file: /config/Jackett/Indexers/bitsearch.json.bak
+jackett  | 04-02 00:15:09 Info Jackett startup finished in 40.715 s
+jackett  | Hosting environment: Production
+jackett  | Content root path: /app/Jackett/Content
+jackett  | Now listening on: http://[::]:9117
+jackett  | Application started. Press Ctrl+C to shut down.
+jackett  | Connection to localhost (::1) 9117 port [tcp/*] succeeded!
+jackett  | [ls.io-init] done.
+
+[Logs] Recent qbittorrent logs:
+
+[Logs] Recent flaresolverr logs:
+flaresolverr  | 2026-04-02 00:13:08 INFO     172.18.0.4 GET http://flaresolverr:8191/ 200 OK
+flaresolverr  | 2026-04-02 00:13:40 INFO     172.18.0.4 GET http://flaresolverr:8191/ 200 OK
+flaresolverr  | 2026-04-02 00:15:15 INFO     172.18.0.4 GET http://flaresolverr:8191/ 200 OK
+
+[Logs] Recent expressvpn logs:
+[Command] Stack start complete.
+[Timing] Elapsed time for 'start': 00:02:55.7182506
+
+[Links] Service endpoints:
+qBittorrent     ]8;;http://localhost:8080/\http://localhost:8080/]8;;\
+Jackett         ]8;;http://localhost:9117/\http://localhost:9117/]8;;\
+FlareSolverr    ]8;;http://localhost:8191/\http://localhost:8191/]8;;\
