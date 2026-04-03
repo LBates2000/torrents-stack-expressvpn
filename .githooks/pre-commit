@@ -3,8 +3,42 @@
 set -eu
 
 # PowerShell linting
-if command -v pwsh >/dev/null 2>&1; then
-  pwsh -Command "if (Get-Command Invoke-ScriptAnalyzer -ErrorAction SilentlyContinue) { Invoke-ScriptAnalyzer -Path ./scripts/*.ps1 -Recurse -Severity Warning,Error } else { Write-Host 'PSScriptAnalyzer not installed.' }"
+ps_lint_files=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.ps1$' || true)
+if [ -n "$ps_lint_files" ]; then
+  if ! command -v pwsh >/dev/null 2>&1; then
+    echo "ERROR: pwsh is required to lint staged PowerShell files."
+    exit 1
+  fi
+
+  PSSCRIPTANALYZER_FILES="$ps_lint_files" pwsh -NoProfile -Command '
+  $module = Get-Module -ListAvailable PSScriptAnalyzer | Select-Object -First 1
+  if (-not $module) {
+    Write-Host "ERROR: PSScriptAnalyzer is required. Install it with: Install-Module PSScriptAnalyzer -Scope CurrentUser -Force -AllowClobber" -ForegroundColor Red
+    exit 1
+  }
+
+  Import-Module PSScriptAnalyzer -ErrorAction Stop
+  $paths = @($env:PSSCRIPTANALYZER_FILES -split "`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+  $results = @()
+  foreach ($path in $paths) {
+    if (Test-Path -LiteralPath $path) {
+      $results += @(Invoke-ScriptAnalyzer -Path $path -Severity Warning,Error)
+    }
+  }
+
+  $warningResults = @($results | Where-Object { $_.Severity -eq "Warning" })
+  if ($warningResults.Count -gt 0) {
+    Write-Host "PSScriptAnalyzer warnings:" -ForegroundColor Yellow
+    $warningResults | Select-Object RuleName, Severity, ScriptName, Line, Message | Format-Table -AutoSize
+  }
+
+  $errorResults = @($results | Where-Object { $_.Severity -eq "Error" })
+  if ($errorResults.Count -gt 0) {
+    Write-Host "PSScriptAnalyzer errors:" -ForegroundColor Red
+    $errorResults | Select-Object RuleName, Severity, ScriptName, Line, Message | Format-Table -AutoSize
+    exit 1
+  }
+  '
 fi
 
 # Shell script linting

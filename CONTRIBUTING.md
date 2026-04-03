@@ -6,7 +6,10 @@ Thanks for contributing to this project.
 - Create a branch from `main`.
 - Do not push directly to `main`; all changes must go through a pull request.
 - Keep changes focused and small.
+- Install local lint dependencies once per machine:
+  - `Install-Module PSScriptAnalyzer -Scope CurrentUser -Force -AllowClobber`
 - Run local checks before opening a PR:
+  - `git hook run pre-commit`
   - `docker compose config`
   - `docker compose ps`
 - Open a pull request and complete the template.
@@ -24,7 +27,7 @@ Thanks for contributing to this project.
 - Do not commit real credentials, API keys, or VPN private keys.
 - Keep `.env` local; update `.env.example` when adding new variables.
 - Enable the local commit guardrail once per clone: `git config core.hooksPath .githooks`.
-- The repo pre-commit hook blocks commits that stage `.env`.
+- The repo pre-commit hook runs `PSScriptAnalyzer` on staged `.ps1` files, reports warnings, fails on analyzer errors, and blocks commits that stage `.env`.
 - CI also fails if `.env` is ever tracked by git.
 
 ## Documentation updates
