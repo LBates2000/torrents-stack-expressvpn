@@ -141,7 +141,7 @@ function ConvertFrom-QbittorrentSaltValue {
 function New-QbittorrentPasswordHash {
     param(
         [Parameter(Mandatory)]
-        [System.Security.SecureString]$Password,
+        [string]$PasswordText,
         [byte[]]$SaltBytes
     )
 
@@ -151,14 +151,7 @@ function New-QbittorrentPasswordHash {
         [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($SaltBytes)
     }
 
-    $passwordBstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Password)
-    try {
-        $passwordValue = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordBstr)
-        $passwordBytes = [System.Text.Encoding]::UTF8.GetBytes($passwordValue)
-    }
-    finally {
-        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordBstr)
-    }
+    $passwordBytes = [System.Text.Encoding]::UTF8.GetBytes($PasswordText)
 
     $pbkdf2 = [System.Security.Cryptography.Rfc2898DeriveBytes]::new(
         $passwordBytes,
@@ -352,8 +345,7 @@ if ([string]::IsNullOrWhiteSpace($webUiPasswordHashValue) -and -not [string]::Is
     if ($Verbose) { Write-Host 'Generating qBittorrent password hash from plaintext...' }
     $existingPasswordValue = Get-IniSetting -Lines $lineList -Section 'Preferences' -Key 'WebUI\Password_PBKDF2'
     $existingSaltBytes = ConvertFrom-QbittorrentSaltValue -ExistingValue $existingPasswordValue
-    $securePassword = ConvertTo-SecureString -String $webUiPasswordPlaintext -AsPlainText -Force
-    $webUiPasswordHashValue = New-QbittorrentPasswordHash -Password $securePassword -SaltBytes $existingSaltBytes
+    $webUiPasswordHashValue = New-QbittorrentPasswordHash -PasswordText $webUiPasswordPlaintext -SaltBytes $existingSaltBytes
     $passwordGeneratedFromPlaintext = $true
     if ($Verbose) { Write-Host 'Password hash generated successfully' }
 }
