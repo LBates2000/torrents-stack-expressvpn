@@ -155,6 +155,21 @@ function ConvertTo-BoolFromStatusLine {
     return $false
 }
 
+function Invoke-ConfigSyncScript {
+    param(
+        [string]$ScriptName,
+        [string]$ServiceName,
+        [string]$FailureMessage
+    )
+
+    $statusLines = & pwsh -NoProfile -File (Join-Path $PSScriptRoot $ScriptName) -SkipRestart -EmitStatus
+    if ($LASTEXITCODE -ne 0) {
+        throw $FailureMessage
+    }
+
+    return (ConvertTo-BoolFromStatusLine -Lines $statusLines -ServiceName $ServiceName)
+}
+
 function Get-ContainerEnvMap {
     param([string]$ContainerName)
 
@@ -258,19 +273,9 @@ function Invoke-StartRefreshPlan {
 # --- Shared Orchestration Functions ---
 function Sync-Configs {
     Write-Host '[Step] Syncing configs...' -ForegroundColor Cyan
-    $jackettStatusLines = & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'sync-jackett-config.ps1') -SkipRestart -EmitStatus
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Jackett config sync failed.'
-    }
-
-    $qbittorrentStatusLines = & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'sync-qbittorrent-config.ps1') -SkipRestart -EmitStatus
-    if ($LASTEXITCODE -ne 0) {
-        throw 'qBittorrent config sync failed.'
-    }
-
     return @{
-        jackett = ConvertTo-BoolFromStatusLine -Lines $jackettStatusLines -ServiceName 'jackett'
-        qbittorrent = ConvertTo-BoolFromStatusLine -Lines $qbittorrentStatusLines -ServiceName 'qbittorrent'
+        jackett = Invoke-ConfigSyncScript -ScriptName 'sync-jackett-config.ps1' -ServiceName 'jackett' -FailureMessage 'Jackett config sync failed.'
+        qbittorrent = Invoke-ConfigSyncScript -ScriptName 'sync-qbittorrent-config.ps1' -ServiceName 'qbittorrent' -FailureMessage 'qBittorrent config sync failed.'
     }
 }
 
@@ -330,20 +335,9 @@ function Start-Stack {
     $maxWait = 600 # seconds (10 minutes)
     $interval = 5  # seconds
     $startTime = Get-Date
-    $serviceStatus = @{}
-    foreach ($svc in $services) { $serviceStatus[$svc] = 'unknown' }
     while ($true) {
-        $allHealthy = $true
-        foreach ($svc in $services) {
-            $inspect = docker inspect --format='{{.State.Health.Status}}' $svc 2>$null
-            if ($LASTEXITCODE -ne 0) {
-                $serviceStatus[$svc] = 'not found'
-                $allHealthy = $false
-            } else {
-                $serviceStatus[$svc] = $inspect
-                if ($inspect -ne 'healthy') { $allHealthy = $false }
-            }
-        }
+        $serviceStatus = Get-ComposeServiceHealthMap -ServiceNames $services
+        $allHealthy = (@($services | Where-Object { $serviceStatus[$_] -ne 'healthy' }).Count -eq 0)
         Show-ServiceStatusTable -serviceStatus $serviceStatus -services $services
         if ($allHealthy) { break }
         if ((Get-Date) - $startTime -gt ([TimeSpan]::FromSeconds($maxWait))) {
@@ -894,15 +888,7 @@ function Show-Status {
     }
 
     $services = @('expressvpn','flaresolverr','jackett','qbittorrent')
-    $serviceStatus = @{}
-    foreach ($svc in $services) {
-        $inspect = docker inspect --format='{{.State.Health.Status}}' $svc 2>$null
-        if ($LASTEXITCODE -ne 0) {
-            $serviceStatus[$svc] = 'not found'
-        } else {
-            $serviceStatus[$svc] = $inspect
-        }
-    }
+    $serviceStatus = Get-ComposeServiceHealthMap -ServiceNames $services
     Show-ServiceStatusTable -serviceStatus $serviceStatus -services $services
     Write-Host '[Status] Stack status (docker compose ps):' -ForegroundColor Green
     docker compose ps

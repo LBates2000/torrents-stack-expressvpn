@@ -138,26 +138,7 @@ if ($hasChanges) {
 }
 
 if ($hasChanges -and -not $SkipRestart) {
-    . "$PSScriptRoot/shared-functions.ps1"
-    Push-Location $repoRoot
-    try {
-        $runningServices = @(docker compose ps --status running --services)
-        if ($runningServices -contains 'jackett') {
-            Write-ProgressLine 'Stopping jackett...' -Color Yellow
-            docker compose stop jackett | Out-Null
-            Write-ProgressLine 'Stopped jackett.  ' -Color Yellow
-            Write-ProgressLine 'Starting jackett...' -Color Yellow
-            docker compose start jackett | Out-Null
-            Write-ProgressLine 'Started jackett.   ' -Color Yellow
-            Write-Host 'Restarted jackett to apply config changes'
-        }
-        else {
-            Write-Host 'Config updated; jackett not running, so restart was not needed'
-        }
-    }
-    finally {
-        Pop-Location
-    }
+    Restart-ComposeServiceIfRunning -RepoRoot $repoRoot -ServiceName 'jackett' -RestartMessage 'Restarted jackett to apply config changes' -NotRunningMessage 'Config updated; jackett not running, so restart was not needed' | Out-Null
 }
 
 if (-not $hasChanges) {

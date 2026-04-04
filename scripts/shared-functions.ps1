@@ -244,6 +244,89 @@ function New-FileIfMissing {
     }
 }
 
+function Get-ComposeRunningServices {
+    param([string]$RepoRoot)
+
+    Push-Location $RepoRoot
+    try {
+        return @(docker compose ps --status running --services)
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+function Stop-ComposeService {
+    param(
+        [string]$RepoRoot,
+        [string]$ServiceName
+    )
+
+    Push-Location $RepoRoot
+    try {
+        Write-ProgressLine ("Stopping {0}..." -f $ServiceName) -Color Yellow
+        docker compose stop $ServiceName | Out-Null
+        Write-ProgressLine ("Stopped {0}.  " -f $ServiceName) -Color Yellow
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+function Start-ComposeService {
+    param(
+        [string]$RepoRoot,
+        [string]$ServiceName
+    )
+
+    Push-Location $RepoRoot
+    try {
+        Write-ProgressLine ("Starting {0}..." -f $ServiceName) -Color Yellow
+        docker compose start $ServiceName | Out-Null
+        Write-ProgressLine ("Started {0}.   " -f $ServiceName) -Color Yellow
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+function Restart-ComposeServiceIfRunning {
+    param(
+        [string]$RepoRoot,
+        [string]$ServiceName,
+        [string]$RestartMessage,
+        [string]$NotRunningMessage
+    )
+
+    $runningServices = Get-ComposeRunningServices -RepoRoot $RepoRoot
+    if ($runningServices -contains $ServiceName) {
+        Stop-ComposeService -RepoRoot $RepoRoot -ServiceName $ServiceName
+        Start-ComposeService -RepoRoot $RepoRoot -ServiceName $ServiceName
+        Write-Host $RestartMessage
+        return $true
+    }
+
+    Write-Host $NotRunningMessage
+    return $false
+}
+
+function Get-ComposeServiceHealthMap {
+    param([string[]]$ServiceNames)
+
+    $serviceStatus = @{}
+    foreach ($serviceName in $ServiceNames) {
+        $inspect = @(docker inspect --format='{{.State.Health.Status}}' $serviceName 2>$null)
+        if ($LASTEXITCODE -ne 0) {
+            $serviceStatus[$serviceName] = 'not found'
+        }
+        else {
+            $serviceStatus[$serviceName] = (@($inspect) -join '').Trim()
+        }
+    }
+
+    return $serviceStatus
+}
+
 # --- qBittorrent Login Check (shared) ---
 function Test-QbittorrentLogin {
     param(

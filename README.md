@@ -53,13 +53,12 @@ pwsh ./scripts/torrents-stack.ps1 start
 - FlareSolverr API: http://localhost:8191
 
 ## ExpressVPN prerequisites
-- Active ExpressVPN subscription and activation code.
-- Docker host that supports `NET_ADMIN` and `/dev/net/tun` for VPN tunneling.
 
 Set `EXPRESSVPN_ACTIVATION_CODE` in `.env` before first startup.
 
-`EXPRESSVPN_REGION`: set a valid region code from the following list:
+`EXPRESSVPN_REGION`: set a valid region code supported by the ExpressVPN image. Common examples:
 
+* smart
 * netherlands-amsterdam
 * netherlands-rotterdam
 * netherlands-the-hague
@@ -163,6 +162,7 @@ docker compose up --force-recreate -d
 - Optional: set `QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT` to generate `WebUI\Password_PBKDF2` automatically during sync (PBKDF2 value wins if both are set).
 - Use `QBITTORRENT_CFG_CATEGORIES_JSON` to populate `configs/qBittorrent/categories.json`.
 - Use `QBITTORRENT_CFG_WATCHED_FOLDERS_JSON` to populate `configs/qBittorrent/watched_folders.json`.
+- On startup, `qbittorrent` also reapplies `save_path` and `temp_path` through the Web API so completed and incomplete downloads stay under `CONTAINER_DOWNLOADS_DIR` instead of drifting back to `/config/Downloads`.
 - On startup, `qbittorrent` bootstraps the Jackett search plugin under `configs/qBittorrent/nova3/engines`:
 	- Installs `jackett.py` automatically (if missing) from `QBITTORRENT_JACKETT_PLUGIN_URL`.
 	- Writes `jackett.json` using `QBITTORRENT_JACKETT_API_KEY` (or auto-reads `configs/Jackett/ServerConfig.json` `APIKey` when empty).
@@ -257,25 +257,7 @@ The bundled PowerShell helpers also respect `HOST_CONFIGS_DIR` and `HOST_DOWNLOA
 pwsh ./scripts/backup-configs.ps1
 pwsh ./scripts/restore-configs.ps1 -Archive .\backups\stack-backup-<timestamp>.zip
 ```
-
-Backup runtime config (PowerShell):
-```powershell
-$stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-New-Item -ItemType Directory -Path .\backups -Force | Out-Null
-Compress-Archive -Path .\configs\* -DestinationPath (".\\backups\\configs-" + $stamp + ".zip") -Force
-```
-
-Restore runtime config (PowerShell):
-```powershell
-docker compose down
-Expand-Archive -Path .\backups\configs-<timestamp>.zip -DestinationPath .\configs -Force
-docker compose up -d
-```
-
-After restore, verify health:
-```powershell
-docker compose ps --format "table {{.Name}}\t{{.State}}\t{{.Health}}\t{{.Status}}"
-```
+- After restore, verify health with `docker compose ps --format "table {{.Name}}\t{{.State}}\t{{.Health}}\t{{.Status}}"`.
 
 ## Notes
 - If you change ExpressVPN activation/region/protocol values, restart the `expressvpn` container.
@@ -284,13 +266,8 @@ docker compose ps --format "table {{.Name}}\t{{.State}}\t{{.Health}}\t{{.Status}
 - Redirect-based healthchecks are intentional: `301`/`302` can still mean the web UI is up before login.
 
 ## Changelog
-- `v1.0.5` (compose: full env parity, parameterize container names/healthcheck/network; fix image-tag-drift indentation; improve drift issue triage layout): unreleased changes currently on `main`
-- `v1.0.4` (compose/docs: add `expressvpn` healthcheck and require `qbittorrent` to wait for `expressvpn` health): https://github.com/LBates2000/torrents-stack-expressvpn/releases/tag/v1.0.4
-- `v1.0.3` (ci: bump actions/checkout to v6): https://github.com/LBates2000/torrents-stack-expressvpn/releases/tag/v1.0.3
-- `v1.0.2` (docs: onboarding and Jackett redirect clarifications): https://github.com/LBates2000/torrents-stack-expressvpn/releases/tag/v1.0.2
-- `v1.0.1` (operationally verified checkpoint): https://github.com/LBates2000/torrents-stack-expressvpn/releases/tag/v1.0.1
-- `v1.0.0` (hardened baseline): https://github.com/LBates2000/torrents-stack-expressvpn/releases/tag/v1.0.0
-- All releases: https://github.com/LBates2000/torrents-stack-expressvpn/releases
+- Latest tagged release: `v1.0.4`.
+- Full release history: https://github.com/LBates2000/torrents-stack-expressvpn/releases
 
 ## Project governance
 - Security policy: see `SECURITY.md`.
