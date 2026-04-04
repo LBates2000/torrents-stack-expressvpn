@@ -377,21 +377,12 @@ else {
 $qbittorrentWasRunningBeforeChanges = $false
 $qbittorrentWasStoppedForConfigWrite = $false
 if (-not $SkipRestart) {
-    Push-Location $repoRoot
-    try {
-        $runningServices = @(docker compose ps --status running --services)
-        $qbittorrentWasRunningBeforeChanges = $runningServices -contains 'qbittorrent'
+    $runningServices = Get-ComposeRunningServices -RepoRoot $repoRoot
+    $qbittorrentWasRunningBeforeChanges = $runningServices -contains 'qbittorrent'
 
-        if ($qbittorrentWasRunningBeforeChanges -and $hasChanges) {
-            . "$PSScriptRoot/shared-functions.ps1"
-            Write-ProgressLine 'Stopping qbittorrent...' -Color Yellow
-            docker compose stop qbittorrent | Out-Null
-            Write-ProgressLine 'Stopped qbittorrent.  ' -Color Yellow
-            $qbittorrentWasStoppedForConfigWrite = $true
-        }
-    }
-    finally {
-        Pop-Location
+    if ($qbittorrentWasRunningBeforeChanges -and $hasChanges) {
+        Stop-ComposeService -RepoRoot $repoRoot -ServiceName 'qbittorrent'
+        $qbittorrentWasStoppedForConfigWrite = $true
     }
 }
 
@@ -419,21 +410,11 @@ $anyChanges = $hasChanges -or $categoriesChanged -or $watchedFoldersChanged
 
 if ($anyChanges -and -not $SkipRestart) {
     if ($qbittorrentWasRunningBeforeChanges) {
-        Push-Location $repoRoot
-        try {
-            if (-not $qbittorrentWasStoppedForConfigWrite) {
-                Write-ProgressLine 'Stopping qbittorrent...' -Color Yellow
-                docker compose stop qbittorrent | Out-Null
-                Write-ProgressLine 'Stopped qbittorrent.  ' -Color Yellow
-            }
-            Write-ProgressLine 'Starting qbittorrent...' -Color Yellow
-            docker compose start qbittorrent | Out-Null
-            Write-ProgressLine 'Started qbittorrent.   ' -Color Yellow
-            Write-Host 'Restarted qbittorrent to apply config changes'
+        if (-not $qbittorrentWasStoppedForConfigWrite) {
+            Stop-ComposeService -RepoRoot $repoRoot -ServiceName 'qbittorrent'
         }
-        finally {
-            Pop-Location
-        }
+        Start-ComposeService -RepoRoot $repoRoot -ServiceName 'qbittorrent'
+        Write-Host 'Restarted qbittorrent to apply config changes'
     }
     else {
         Write-Host 'Config updated; qbittorrent not running, so restart was not needed'
