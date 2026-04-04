@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-
 set -euo pipefail
 
-QBITTORRENT_CONF="/config/qBittorrent.conf"
-ENGINES_DIR="${QBITTORRENT_ENGINES_DIR:-/config/qBittorrent/nova3/engines}"
+QBITTORRENT_CONFIG_DIR="${QBITTORRENT_CONFIG_DIR:-/config/qBittorrent}"
+QBITTORRENT_CONF="${QBITTORRENT_CONF:-${QBITTORRENT_CONFIG_DIR}/qBittorrent.conf}"
+ENGINES_DIR="${QBITTORRENT_ENGINES_DIR:-${QBITTORRENT_CONFIG_DIR}/nova3/engines}"
 PLUGIN_PATH="${ENGINES_DIR}/jackett.py"
 CONFIG_PATH="${ENGINES_DIR}/jackett.json"
 JACKETT_CONFIG_PATH="${JACKETT_CONFIG_PATH:-/config/Jackett/ServerConfig.json}"
@@ -12,8 +12,73 @@ JACKETT_PLUGIN_URL="${QBITTORRENT_JACKETT_PLUGIN_URL:-https://raw.githubusercont
 JACKETT_URL="${QBITTORRENT_JACKETT_URL:-http://jackett:9117}"
 THREAD_COUNT="${QBITTORRENT_JACKETT_THREAD_COUNT:-20}"
 TRACKER_FIRST="${QBITTORRENT_JACKETT_TRACKER_FIRST:-false}"
+QBITTORRENT_WEBUI_URL="${QBITTORRENT_WEBUI_URL:-http://127.0.0.1:${WEBUI_PORT:-8080}}"
+QBITTORRENT_WEBUI_USERNAME="${QBITTORRENT_WEBUI_USERNAME:-admin}"
+QBITTORRENT_DEFAULT_SAVE_PATH="${QBITTORRENT_CFG_DOWNLOADS_SAVE_PATH:-/downloads/}"
+QBITTORRENT_TEMP_SAVE_PATH="${QBITTORRENT_CFG_DOWNLOADS_TEMP_PATH:-/downloads/incomplete/}"
 
-mkdir -p "${ENGINES_DIR}"
+mkdir -p "${QBITTORRENT_CONFIG_DIR}" "${ENGINES_DIR}"
+
+trim_trailing_slash() {
+  local value="${1:-}"
+  while [ "${#value}" -gt 1 ] && [ "${value%/}" != "$value" ]; do
+    value="${value%/}"
+  done
+  printf '%s' "$value"
+}
+
+apply_download_preferences() {
+  if [ -z "${QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT:-}" ]; then
+    echo "[qbittorrent-bootstrap] Skipping Web API preference sync because QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT is not set"
+    return 0
+  fi
+
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "[qbittorrent-bootstrap] WARN: curl is unavailable; cannot sync qBittorrent save paths via Web API"
+    return 0
+  fi
+
+  local default_save_path
+  local temp_save_path
+  local cookie_jar
+  local status_code
+  local login_response
+  local preferences_json
+
+  default_save_path="$(trim_trailing_slash "$QBITTORRENT_DEFAULT_SAVE_PATH")"
+  temp_save_path="$(trim_trailing_slash "$QBITTORRENT_TEMP_SAVE_PATH")"
+  cookie_jar="$(mktemp)"
+
+  for _ in $(seq 1 30); do
+    status_code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "${QBITTORRENT_WEBUI_URL}/" || true)"
+    case "$status_code" in
+      200|302|403)
+        break
+        ;;
+    esac
+    sleep 2
+  done
+
+  login_response="$(curl -fsS --cookie-jar "$cookie_jar" \
+    --data-urlencode "username=${QBITTORRENT_WEBUI_USERNAME}" \
+    --data-urlencode "password=${QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT}" \
+    "${QBITTORRENT_WEBUI_URL}/api/v2/auth/login" 2>/dev/null || true)"
+
+  if [ "$login_response" != 'Ok.' ]; then
+    echo "[qbittorrent-bootstrap] WARN: Could not log in to qBittorrent Web API to sync save paths"
+    rm -f "$cookie_jar"
+    return 0
+  fi
+
+  preferences_json=$(printf '{"save_path":"%s","temp_path":"%s","temp_path_enabled":true}' "$default_save_path" "$temp_save_path")
+  if curl -fsS --cookie "$cookie_jar" --data-urlencode "json=${preferences_json}" "${QBITTORRENT_WEBUI_URL}/api/v2/app/setPreferences" >/dev/null; then
+    echo "[qbittorrent-bootstrap] Applied qBittorrent save paths via Web API"
+  else
+    echo "[qbittorrent-bootstrap] WARN: Failed to apply qBittorrent save paths via Web API"
+  fi
+
+  rm -f "$cookie_jar"
+}
 
 # Download Jackett plugin if missing
 if [ ! -s "${PLUGIN_PATH}" ]; then
@@ -97,7 +162,6 @@ EOF
 fi
 
 # Set qBittorrent WebUI password hash if QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT is set
-QBITTORRENT_CONF="/config/qBittorrent.conf"
 if [ -n "${QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT:-}" ]; then
   echo "[qbittorrent-bootstrap] Attempting to set WebUI password hash from QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT..."
   if command -v python3 >/dev/null 2>&1; then
@@ -133,3 +197,5 @@ EOF
 else
   echo "[qbittorrent-bootstrap] QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT not set or empty inside the container, skipping WebUI password hash."
 fi
+
+apply_download_preferences

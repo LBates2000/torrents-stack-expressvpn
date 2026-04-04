@@ -1,26 +1,31 @@
 #!/bin/bash
-# Healthcheck script for qBittorrent: verifies login and Jackett API key
+set -euo pipefail
 
-QBITTORRENT_URL="http://localhost:8080"
-QBITTORRENT_USER="admin"
-QBITTORRENT_PASS="temp03202026"
-EXPECTED_API_KEY="cwgfqc90uk7fu634md5k8eoqgmp7ycor"
+QBITTORRENT_URL="http://localhost:8080/"
+QBITTORRENT_CONF="/config/qBittorrent/qBittorrent.conf"
+PLUGIN_PY="/config/qBittorrent/nova3/engines/jackett.py"
+PLUGIN_JSON="/config/qBittorrent/nova3/engines/jackett.json"
 
-# Login and get cookie
-COOKIE=$(curl -s -i -X POST -d "username=$QBITTORRENT_USER&password=$QBITTORRENT_PASS" "$QBITTORRENT_URL/api/v2/auth/login" | grep -i 'set-cookie' | awk '{print $2}' | cut -d';' -f1)
+STATUS_CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$QBITTORRENT_URL" || true)"
+case "$STATUS_CODE" in
+  200|302)
+    ;;
+  *)
+    echo "qBittorrent Web UI unhealthy (status: ${STATUS_CODE:-none})"
+    exit 1
+    ;;
+esac
 
-if [ -z "$COOKIE" ]; then
-  echo "qBittorrent login failed"
+if [ ! -s "$PLUGIN_PY" ] || [ ! -s "$PLUGIN_JSON" ]; then
+  echo "qBittorrent Jackett plugin files are missing"
   exit 1
 fi
 
-# Check Jackett API key in config (mounted as /config/qBittorrent.conf)
-API_KEY=$(grep -oP 'QBITTORRENT_JACKETT_API_KEY=\K[a-z0-9]{32}' /config/qBittorrent.conf)
-
-if [ "$API_KEY" != "$EXPECTED_API_KEY" ]; then
-  echo "qBittorrent Jackett API key mismatch: got $API_KEY, expected $EXPECTED_API_KEY"
+API_KEY="$(grep -oP 'QBITTORRENT_JACKETT_API_KEY=\K[a-z0-9]{32}' "$QBITTORRENT_CONF" 2>/dev/null || true)"
+if [ -z "$API_KEY" ]; then
+  echo "qBittorrent Jackett API key missing from $QBITTORRENT_CONF"
   exit 1
 fi
 
-echo "qBittorrent login and Jackett API key check passed"
+echo "qBittorrent Web UI reachable and Jackett plugin config present"
 exit 0
