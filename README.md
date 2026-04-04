@@ -5,6 +5,14 @@
 
 This stack routes only qBittorrent through ExpressVPN.
 
+## Project Status
+
+This repository is in maintenance mode.
+
+- The stack is considered stable for its current scope.
+- Future changes should be limited to break-fix work, security updates, dependency maintenance, or documentation corrections.
+- For the latest tagged release and release notes, use the releases page: https://github.com/LBates2000/torrents-stack-expressvpn/releases
+
 
 ## Stack Commands (Wrapper Script)
 
@@ -266,8 +274,7 @@ pwsh ./scripts/restore-configs.ps1 -Archive .\backups\stack-backup-<timestamp>.z
 - Redirect-based healthchecks are intentional: `301`/`302` can still mean the web UI is up before login.
 
 ## Changelog
-- Latest tagged release: `v1.0.4`.
-- Full release history: https://github.com/LBates2000/torrents-stack-expressvpn/releases
+- Latest release and full history: https://github.com/LBates2000/torrents-stack-expressvpn/releases
 
 ## Project governance
 - Security policy: see `SECURITY.md`.
