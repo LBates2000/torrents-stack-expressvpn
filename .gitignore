@@ -5,6 +5,7 @@ backups/
 
 # Generated runtime logs and scratch outputs
 logs/*.log
+logs/stack-test-*.md
 bootstrap-debug.log
 docker-pull-test.txt
 start-output.txt

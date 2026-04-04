@@ -20,7 +20,8 @@ x-qbittorrent-command: &qbittorrent-command
   command: >-
     /bin/bash -c "sleep 20 &&
     { echo 'nameserver 127.0.0.11'; grep -v '^nameserver 127.0.0.11$' /shared_data/resolv.conf; } > /etc/resolv.conf &&
-    mkdir -p ${CONTAINER_DOWNLOADS_DIR:-/downloads}/watch ${CONTAINER_DOWNLOADS_DIR:-/downloads}/watch/movies ${CONTAINER_DOWNLOADS_DIR:-/downloads}/watch/tv &&
+    mkdir -p ${CONTAINER_DOWNLOADS_DIR:-/downloads} ${CONTAINER_DOWNLOADS_DIR:-/downloads}/incomplete ${CONTAINER_DOWNLOADS_DIR:-/downloads}/movies ${CONTAINER_DOWNLOADS_DIR:-/downloads}/tv ${CONTAINER_DOWNLOADS_DIR:-/downloads}/watch ${CONTAINER_DOWNLOADS_DIR:-/downloads}/watch/movies ${CONTAINER_DOWNLOADS_DIR:-/downloads}/watch/tv &&
+    rmdir ${CONTAINER_CONFIGS_DIR:-/config}/Downloads 2>/dev/null || true &&
     bash /tmp/bootstrap-qbittorrent-jackett.sh || true &&
     sleep infinity"
 

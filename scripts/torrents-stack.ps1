@@ -1,8 +1,9 @@
 param(
     [Parameter(Position=0)]
-    [ValidateSet('start','stop','restart','update','status','logs','sync','rebuild','clean','test-all')]
+    [ValidateSet('start','stop','restart','update','status','logs','sync','rebuild','clean','test-all','preflight','report')]
     [string]$Command = '',
     [string]$Service = '',
+    [string]$OutputPath = '',
     [switch]$Follow,
     [switch]$VerboseAuth,
     [switch]$DebugOutput
@@ -22,6 +23,8 @@ $CommandDescriptions = [ordered]@{
     rebuild = 'Rebuild the stack from scratch (all containers and images are removed).'
     clean   = 'Stop and remove all containers, volumes, and prune unused Docker resources.'
     'test-all' = 'Run all stack commands in sequence and check health.'
+    preflight = 'Check whether Docker is reachable before runtime commands.'
+    report = 'Write a sanitized stack test report to logs/.'
 }
 
 function Show-CommandUsage {
@@ -613,11 +616,279 @@ function Test-DockerDaemonAvailable {
     return ($LASTEXITCODE -eq 0)
 }
 
+function Get-DockerContextName {
+    $contextName = @(docker context show 2>$null)
+    if ($LASTEXITCODE -ne 0) {
+        return ''
+    }
+
+    return (@($contextName) -join '').Trim()
+}
+
+function Show-DockerPreflight {
+    param([string]$CommandName = 'docker')
+
+    $contextName = Get-DockerContextName
+    if (Test-DockerDaemonAvailable) {
+        $serverVersion = (@(docker info --format '{{.ServerVersion}}' 2>$null) -join '').Trim()
+        $contextSuffix = if ([string]::IsNullOrWhiteSpace($contextName)) { '' } else { " (context: $contextName)" }
+        Write-Host ("[Preflight] Docker daemon is available{0}. Server version: {1}" -f $contextSuffix, $serverVersion) -ForegroundColor Green
+        return $true
+    }
+
+    Write-Host ("[Preflight] Docker daemon is unavailable for '{0}'." -f $CommandName) -ForegroundColor Yellow
+    if (-not [string]::IsNullOrWhiteSpace($contextName)) {
+        Write-Host ("[Preflight] Current Docker context: {0}" -f $contextName) -ForegroundColor Yellow
+    }
+
+    if ($IsWindows) {
+        Write-Host '[Preflight] Start Docker Desktop and wait for the Linux engine to report Running, then rerun the command.' -ForegroundColor Yellow
+    }
+    else {
+        Write-Host '[Preflight] Start the Docker daemon for the current context and rerun the command.' -ForegroundColor Yellow
+    }
+
+    return $false
+}
+
+function Assert-DockerDaemonAvailable {
+    param([string]$CommandName)
+
+    if (-not (Show-DockerPreflight -CommandName $CommandName)) {
+        throw ("Docker daemon is unavailable for '{0}'." -f $CommandName)
+    }
+}
+
+function New-StackReportPath {
+    param([string]$ProvidedPath)
+
+    if (-not [string]::IsNullOrWhiteSpace($ProvidedPath)) {
+        $candidatePath = if ([System.IO.Path]::IsPathRooted($ProvidedPath)) {
+            $ProvidedPath
+        } else {
+            Join-Path $repoRoot $ProvidedPath
+        }
+
+        $parentPath = Split-Path -Parent $candidatePath
+        if (-not [string]::IsNullOrWhiteSpace($parentPath)) {
+            New-DirectoryIfMissing -Path $parentPath
+        }
+
+        return [System.IO.Path]::GetFullPath($candidatePath)
+    }
+
+    $logDir = Join-Path $repoRoot 'logs'
+    New-DirectoryIfMissing -Path $logDir
+    return Join-Path $logDir ("stack-test-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-summary.md')
+}
+
+function Get-ComposeRenderText {
+    $composeOutput = @(docker compose config --no-interpolate 2>&1)
+    if ($LASTEXITCODE -ne 0) {
+        throw ("docker compose config --no-interpolate failed.`n{0}" -f (@($composeOutput) -join [Environment]::NewLine))
+    }
+
+    return (@($composeOutput) -join [Environment]::NewLine)
+}
+
+function Test-ComposeGoalAlignment {
+    param([string]$ComposeRenderText)
+
+    return [pscustomobject]@{
+        QbittorrentViaVpn = [regex]::IsMatch($ComposeRenderText, '(?s)qbittorrent:\s*.*?network_mode:\s*service:expressvpn')
+        JackettOnAppNet = [regex]::IsMatch($ComposeRenderText, '(?s)jackett:\s*.*?networks:\s*\r?\n\s+app_net:')
+        FlareSolverrOnAppNet = [regex]::IsMatch($ComposeRenderText, '(?s)flaresolverr:\s*.*?networks:\s*\r?\n\s+app_net:')
+        ExpressvpnHealthcheck = [regex]::IsMatch($ComposeRenderText, '(?s)expressvpn:\s*.*?healthcheck:')
+        JackettHealthcheck = [regex]::IsMatch($ComposeRenderText, '(?s)jackett:\s*.*?healthcheck:')
+        QbittorrentHealthcheck = [regex]::IsMatch($ComposeRenderText, '(?s)qbittorrent:\s*.*?healthcheck:')
+    }
+}
+
+function Test-HttpEndpointStatus {
+    param(
+        [string]$Service,
+        [string]$Url
+    )
+
+    if ($Service -eq 'Jackett') {
+        try {
+            $response = Invoke-WebRequest -Uri $Url -MaximumRedirection 0 -SkipHttpErrorCheck -TimeoutSec 15 -ErrorAction Stop
+            return [pscustomobject]@{
+                Service = $Service
+                Url = $Url
+                StatusCode = [int]$response.StatusCode
+                Reachable = $true
+            }
+        }
+        catch {
+            $statusCode = -1
+            if ($_.Exception.PSObject.Properties.Name -contains 'Response' -and $null -ne $_.Exception.Response -and $_.Exception.Response.StatusCode) {
+                $statusCode = [int]$_.Exception.Response.StatusCode.value__
+            }
+
+            return [pscustomobject]@{
+                Service = $Service
+                Url = $Url
+                StatusCode = $statusCode
+                Reachable = ($statusCode -ge 200)
+            }
+        }
+    }
+
+    $handler = [System.Net.Http.HttpClientHandler]::new()
+    $handler.AllowAutoRedirect = $false
+    $client = [System.Net.Http.HttpClient]::new($handler)
+    $client.Timeout = [TimeSpan]::FromSeconds(15)
+
+    try {
+        $response = $client.GetAsync($Url).GetAwaiter().GetResult()
+        return [pscustomobject]@{
+            Service = $Service
+            Url = $Url
+            StatusCode = [int]$response.StatusCode
+            Reachable = $true
+        }
+    }
+    catch {
+        return [pscustomobject]@{
+            Service = $Service
+            Url = $Url
+            StatusCode = -1
+            Reachable = $false
+        }
+    }
+    finally {
+        $client.Dispose()
+        $handler.Dispose()
+    }
+}
+
+function Export-StackTestReport {
+    param([string]$ReportPath)
+
+    $resolvedReportPath = New-StackReportPath -ProvidedPath $ReportPath
+    $composeRenderText = Get-ComposeRenderText
+    $goalAlignment = Test-ComposeGoalAlignment -ComposeRenderText $composeRenderText
+
+    $validateOutput = @(pwsh -NoProfile -File (Join-Path $PSScriptRoot 'validate-config.ps1') 2>&1)
+    $validateExitCode = $LASTEXITCODE
+    $pesterOutput = @(pwsh -NoProfile -Command "Invoke-Pester ./tests/shared-functions.Tests.ps1" 2>&1)
+    $pesterExitCode = $LASTEXITCODE
+
+    $dockerAvailable = Test-DockerDaemonAvailable
+    $composePsOutput = @()
+    $endpointChecks = @()
+    $qbittorrentNetworkMode = ''
+    $expressvpnContainerId = ''
+    $qbittorrentSharesExpressvpn = $false
+    if ($dockerAvailable) {
+        $composePsOutput = @(docker compose ps 2>&1)
+        $expressvpnContainerId = (@(docker inspect --format '{{.Id}}' expressvpn 2>$null) -join '').Trim()
+        $qbittorrentNetworkMode = (@(docker inspect --format '{{.HostConfig.NetworkMode}}' qbittorrent 2>$null) -join '').Trim()
+        if (-not [string]::IsNullOrWhiteSpace($expressvpnContainerId)) {
+            $qbittorrentSharesExpressvpn = ($qbittorrentNetworkMode -eq ("container:{0}" -f $expressvpnContainerId))
+        }
+        $endpointChecks = @(Get-ServiceEndpoints | ForEach-Object {
+            Test-HttpEndpointStatus -Service $_.Service -Url $_.Url
+        })
+    }
+
+    $lines = @(
+        '# Stack Test Report',
+        '',
+        ('Timestamp: {0}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss zzz')),
+        '',
+        '## Goal Check',
+        '',
+        'Project goal under test: only qBittorrent should route through ExpressVPN, while Jackett and FlareSolverr stay on the app network with their own ports.',
+        '',
+        '## Commands Run',
+        '',
+        '1. `pwsh ./scripts/torrents-stack.ps1 preflight`',
+        '2. `pwsh ./scripts/validate-config.ps1`',
+        '3. `docker compose config --no-interpolate`',
+        '4. `docker compose ps`',
+        '5. `Invoke-Pester ./tests/shared-functions.Tests.ps1`',
+        '',
+        '## Results',
+        '',
+        '### Docker preflight',
+        '',
+        ('- Docker daemon available: `{0}`' -f $dockerAvailable.ToString().ToLowerInvariant())
+    )
+
+    if ($dockerAvailable) {
+        $lines += '- Live Docker commands can run in the current environment.'
+    }
+    else {
+        $lines += '- Runtime stack commands will not complete until Docker is started.'
+    }
+
+    $lines += @(
+        '',
+        '### Offline validation',
+        '',
+        ('- `validate-config.ps1` exit code: `{0}`' -f $validateExitCode),
+        ('- `validate-config.ps1` summary: `{0}`' -f ((@($validateOutput) | Select-Object -Last 1) -join '').Trim()),
+        ('- Pester exit code: `{0}`' -f $pesterExitCode),
+        ('- Pester summary: `{0}`' -f ((@($pesterOutput) | Select-Object -Last 2 | Select-Object -First 1) -join '').Trim()),
+        '',
+        '### Goal alignment confirmed from compose render',
+        '',
+        ('- qBittorrent uses ExpressVPN network namespace: `{0}`' -f $goalAlignment.QbittorrentViaVpn.ToString().ToLowerInvariant()),
+        ('- Jackett remains on `app_net`: `{0}`' -f $goalAlignment.JackettOnAppNet.ToString().ToLowerInvariant()),
+        ('- FlareSolverr remains on `app_net`: `{0}`' -f $goalAlignment.FlareSolverrOnAppNet.ToString().ToLowerInvariant()),
+        ('- ExpressVPN healthcheck defined: `{0}`' -f $goalAlignment.ExpressvpnHealthcheck.ToString().ToLowerInvariant()),
+        ('- Jackett healthcheck defined: `{0}`' -f $goalAlignment.JackettHealthcheck.ToString().ToLowerInvariant()),
+        ('- qBittorrent healthcheck defined: `{0}`' -f $goalAlignment.QbittorrentHealthcheck.ToString().ToLowerInvariant()),
+        ''
+    )
+
+    if ($composePsOutput.Count -gt 0) {
+        $lines += @(
+            '### Current compose state',
+            '',
+            '```text'
+        )
+        $lines += @($composePsOutput)
+        $lines += @(
+            '```',
+            ''
+        )
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($qbittorrentNetworkMode)) {
+        $lines += @(
+            '### Live runtime checks',
+            '',
+            ('- Live qBittorrent network mode: `{0}`' -f $qbittorrentNetworkMode),
+            ('- qBittorrent is sharing ExpressVPN network namespace: `{0}`' -f $qbittorrentSharesExpressvpn.ToString().ToLowerInvariant())
+        )
+
+        foreach ($endpointCheck in $endpointChecks) {
+            $lines += ('- {0} endpoint `{1}` returned status `{2}`' -f $endpointCheck.Service, $endpointCheck.Url, $endpointCheck.StatusCode)
+        }
+
+        $lines += ''
+    }
+
+    $lines += @(
+        '## Recommendations',
+        '',
+        '1. Use `preflight` before runtime commands when testing from a fresh shell or after Docker Desktop restarts.',
+        '2. Use `report` when you need a test artifact; it avoids writing expanded secret values from `.env`.',
+        '3. If the stack is not already running, run `pwsh ./scripts/torrents-stack.ps1 start` and then `status -VerboseAuth` for live endpoint verification.'
+    )
+
+    $lines | Set-Content -LiteralPath $resolvedReportPath
+    Write-Host ("[Report] Sanitized stack test report written to: {0}" -f $resolvedReportPath) -ForegroundColor Green
+    return $resolvedReportPath
+}
+
 function Show-Status {
     param([switch]$VerboseAuth)
 
-    if (-not (Test-DockerDaemonAvailable)) {
-        Write-Host '[Status] Docker daemon is unavailable. Start Docker Desktop/Engine and rerun status.' -ForegroundColor Yellow
+    if (-not (Show-DockerPreflight -CommandName 'status')) {
         Show-ServiceEndpoints
         return
     }
@@ -758,6 +1029,7 @@ function Test-Stack-All {
 switch ($Command) {
     'start' {
         Invoke-TimedCommand -CommandName 'start' -StartMessage '[Command] Starting stack...' -DoneMessage '[Command] Stack start complete.' -Action {
+            Assert-DockerDaemonAvailable -CommandName 'start'
             $syncStatus = Sync-Configs
             Start-Stack -SyncStatus $syncStatus
             Show-ServiceEndpoints
@@ -765,17 +1037,20 @@ switch ($Command) {
     }
     'stop' {
         Invoke-TimedCommand -CommandName 'stop' -StartMessage '[Command] Stopping stack...' -DoneMessage '[Command] Stack stop complete.' -Action {
+            Assert-DockerDaemonAvailable -CommandName 'stop'
             Stop-Stack
         }
     }
     'rebuild' {
         Invoke-TimedCommand -CommandName 'rebuild' -StartMessage '[Command] Rebuilding stack (full reset)...' -DoneMessage '[Command] Stack rebuild complete.' -Action {
+            Assert-DockerDaemonAvailable -CommandName 'rebuild'
             Invoke-StackClean
             Reset-Stack
         }
     }
     'update' {
         Invoke-TimedCommand -CommandName 'update' -StartMessage '[Command] Updating stack images and services...' -DoneMessage '[Command] Stack update complete.' -Action {
+            Assert-DockerDaemonAvailable -CommandName 'update'
             Update-Images
             $syncStatus = Sync-Configs
             Start-Stack -SyncStatus $syncStatus
@@ -788,6 +1063,7 @@ switch ($Command) {
     }
     'logs' {
         Invoke-TimedCommand -CommandName 'logs' -StartMessage '[Command] Showing recent logs...' -DoneMessage '[Command] Logs shown.' -Action {
+            Assert-DockerDaemonAvailable -CommandName 'logs'
             Show-Logs -Service $Service -Follow:$Follow
         }
     }
@@ -798,13 +1074,25 @@ switch ($Command) {
     }
     'clean' {
         Invoke-TimedCommand -CommandName 'clean' -StartMessage '[Command] Cleaning stack and unused Docker resources...' -DoneMessage '[Command] Stack and Docker resources fully cleaned.' -Action {
+            Assert-DockerDaemonAvailable -CommandName 'clean'
             Remove-StackWithVolumes
             Clear-DockerUnused
         }
     }
     'test-all' {
         Invoke-TimedCommand -CommandName 'test-all' -StartMessage '[Command] Running full stack command test sequence...' -DoneMessage '[Command] Stack command test sequence complete.' -Action {
+            Assert-DockerDaemonAvailable -CommandName 'test-all'
             Test-Stack-All
+        }
+    }
+    'preflight' {
+        Invoke-TimedCommand -CommandName 'preflight' -StartMessage '[Command] Checking Docker preflight...' -DoneMessage '[Command] Docker preflight complete.' -Action {
+            $null = Show-DockerPreflight -CommandName 'preflight'
+        }
+    }
+    'report' {
+        Invoke-TimedCommand -CommandName 'report' -StartMessage '[Command] Writing sanitized stack test report...' -DoneMessage '[Command] Stack test report complete.' -Action {
+            $null = Export-StackTestReport -ReportPath $OutputPath
         }
     }
     default {

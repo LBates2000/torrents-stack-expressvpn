@@ -20,12 +20,15 @@ pwsh ./scripts/torrents-stack.ps1
 Get-Help ./scripts/torrents-stack.ps1 -Detailed
 ```
 
-Supported commands: `start`, `stop`, `restart`, `update`, `status`, `logs`, `sync`, `rebuild`, `clean`, `test-all`.
+Supported commands: `start`, `stop`, `restart`, `update`, `status`, `logs`, `sync`, `rebuild`, `clean`, `test-all`, `preflight`, `report`.
 
 Example:
 ```
 pwsh ./scripts/torrents-stack.ps1 start
 ```
+
+- `preflight` checks whether Docker is reachable before runtime operations.
+- `report` writes a sanitized stack test report under `logs/` without expanding secret values from `.env`.
 
 ## Secrets handling
 - Keep real secrets only in local `.env`; do not commit them to git.
@@ -38,6 +41,7 @@ pwsh ./scripts/torrents-stack.ps1 start
 
 ## How it works
 - `expressvpn` is the VPN gateway.
+- The ExpressVPN entrypoint retries login/connect on startup and runs a lightweight reconnect watchdog if the daemon later drops the tunnel.
 - `qbittorrent` uses `network_mode: "service:expressvpn"`, so torrent traffic goes through ExpressVPN.
 - `jackett` and `flaresolverr` run on `app_net` and expose their own ports.
 - Host access is published by the compose port mappings.
@@ -192,7 +196,7 @@ HEALTHCHECK_START_PERIOD=45s
 - `qbittorrent` waits for `expressvpn`, `jackett`, and `flaresolverr` to be healthy.
 
 ## Healthchecks (service-specific)
-- `expressvpn`: default `strict` mode checks `tun0` in `/proc/net/dev` when `ACTIVATION_CODE` is set; set `EXPRESSVPN_HEALTHCHECK_MODE=relaxed` to bypass in CI/dev.
+- `expressvpn`: default `strict` mode requires `expressvpnctl` to report `Connected` and then verifies DNS plus outbound web access; set `EXPRESSVPN_HEALTHCHECK_MODE=relaxed` to only require the daemon to respond in CI/dev.
 - `flaresolverr`: checks `http://localhost:8191`
 - `jackett`: checks `http://localhost:9117/` and accepts `200`, `301`, or `302`
 - `qbittorrent`: checks `http://localhost:8080/` and accepts `200` or `302`

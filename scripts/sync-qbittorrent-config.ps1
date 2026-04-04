@@ -307,6 +307,8 @@ New-DirectoryIfMissing -Path (Join-Path $qbittorrentConfigDir 'rss')
 New-DirectoryIfMissing -Path (Join-Path $qbittorrentConfigDir 'rss/articles')
 New-DirectoryIfMissing -Path (Join-Path $qbittorrentConfigDir 'GeoDB')
 New-DirectoryIfMissing -Path $downloadsRoot
+New-DirectoryIfMissing -Path (Join-Path $downloadsRoot 'movies')
+New-DirectoryIfMissing -Path (Join-Path $downloadsRoot 'tv')
 New-DirectoryIfMissing -Path (Join-Path $downloadsRoot 'watch')
 New-DirectoryIfMissing -Path (Join-Path $downloadsRoot 'watch/movies')
 New-DirectoryIfMissing -Path (Join-Path $downloadsRoot 'watch/tv')

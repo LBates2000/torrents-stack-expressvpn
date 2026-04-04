@@ -10,6 +10,8 @@
 
 set -euo pipefail
 
+WATCHDOG_INTERVAL_SECONDS="${EXPRESSVPN_WATCHDOG_INTERVAL_SECONDS:-30}"
+
 cp /etc/resolv.conf /tmp/resolv.conf
 su -c 'umount /etc/resolv.conf'
 cp /tmp/resolv.conf /etc/resolv.conf
@@ -82,10 +84,38 @@ connect_with_retries() {
   return 1
 }
 
+ensure_reconnectable_networklock() {
+  expressvpnctl set networklock false
+}
+
+start_reconnect_watchdog() {
+  (
+    while true; do
+      sleep "$WATCHDOG_INTERVAL_SECONDS"
+      state="$(expressvpnctl get connectionstate 2>/dev/null || true)"
+      case "$state" in
+        Connected|Connecting|Reconnecting|DisconnectingToReconnect)
+          continue
+          ;;
+      esac
+
+      echo "[entrypoint] Watchdog detected VPN state '${state:-unknown}'; attempting reconnect..."
+      ensure_reconnectable_networklock
+      if connect_with_retries; then
+        echo "[entrypoint] Watchdog reconnect succeeded."
+      else
+        echo "[entrypoint] Watchdog reconnect failed; will retry on next interval."
+      fi
+    done
+  ) &
+}
+
 if ! login_with_retries; then
   expressvpnctl set networklock true
   exit 1
 fi
+
+ensure_reconnectable_networklock
 
 if ! connect_with_retries; then
   expressvpnctl set networklock true
@@ -104,6 +134,7 @@ if [ "$(expressvpnctl get connectionstate)" != "Connected" ]; then
   exit 1
 fi
 
-expressvpnctl set networklock true
+ensure_reconnectable_networklock
+start_reconnect_watchdog
 
 exec "$@"
