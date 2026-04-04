@@ -3,6 +3,7 @@
 Thanks for contributing to this project.
 
 ## Workflow
+- This project is in maintenance mode; prefer small, targeted changes.
 - Create a branch from `main`.
 - Do not push directly to `main`; all changes must go through a pull request.
 - Keep changes focused and small.
