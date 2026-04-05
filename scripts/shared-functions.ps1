@@ -256,6 +256,48 @@ function Get-ComposeRunningServices {
     }
 }
 
+function Get-ComposeServiceState {
+    param([string]$ServiceName)
+
+    $inspect = @(docker inspect --format='{{if .State}}{{.State.Status}}{{end}}|{{if .State.Health}}{{.State.Health.Status}}{{end}}|{{slice .Id 0 12}}' $ServiceName 2>$null)
+    if ($LASTEXITCODE -ne 0) {
+        return [pscustomobject]@{
+            ServiceName   = $ServiceName
+            Exists        = $false
+            Lifecycle     = 'not found'
+            Health        = ''
+            DisplayStatus = 'not found'
+            ContainerId   = ''
+        }
+    }
+
+    $parts = ((@($inspect) -join '').Trim() -split '\|', 3)
+    $lifecycle = if ($parts.Count -ge 1 -and -not [string]::IsNullOrWhiteSpace($parts[0])) { $parts[0].Trim() } else { 'unknown' }
+    $health = if ($parts.Count -ge 2) { $parts[1].Trim() } else { '' }
+    $containerId = if ($parts.Count -ge 3) { $parts[2].Trim() } else { '' }
+    $displayStatus = if (-not [string]::IsNullOrWhiteSpace($health)) { $health } else { $lifecycle }
+
+    return [pscustomobject]@{
+        ServiceName   = $ServiceName
+        Exists        = $true
+        Lifecycle     = $lifecycle
+        Health        = $health
+        DisplayStatus = $displayStatus
+        ContainerId   = $containerId
+    }
+}
+
+function Get-ComposeServiceStateMap {
+    param([string[]]$ServiceNames)
+
+    $stateMap = @{}
+    foreach ($serviceName in $ServiceNames) {
+        $stateMap[$serviceName] = Get-ComposeServiceState -ServiceName $serviceName
+    }
+
+    return $stateMap
+}
+
 function Stop-ComposeService {
     param(
         [string]$RepoRoot,
@@ -314,17 +356,34 @@ function Get-ComposeServiceHealthMap {
     param([string[]]$ServiceNames)
 
     $serviceStatus = @{}
+    $stateMap = Get-ComposeServiceStateMap -ServiceNames $ServiceNames
     foreach ($serviceName in $ServiceNames) {
-        $inspect = @(docker inspect --format='{{.State.Health.Status}}' $serviceName 2>$null)
-        if ($LASTEXITCODE -ne 0) {
-            $serviceStatus[$serviceName] = 'not found'
-        }
-        else {
-            $serviceStatus[$serviceName] = (@($inspect) -join '').Trim()
-        }
+        $serviceStatus[$serviceName] = $stateMap[$serviceName].DisplayStatus
     }
 
     return $serviceStatus
+}
+
+function Get-ComposeServiceLatestHealthLog {
+    param([string]$ServiceName)
+
+    $healthLogJson = @(docker inspect --format='{{if .State.Health}}{{json .State.Health.Log}}{{end}}' $ServiceName 2>$null)
+    if ($LASTEXITCODE -ne 0) {
+        return $null
+    }
+
+    $rawJson = (@($healthLogJson) -join '').Trim()
+    if ([string]::IsNullOrWhiteSpace($rawJson)) {
+        return $null
+    }
+
+    try {
+        $healthLogs = $rawJson | ConvertFrom-Json
+        return @($healthLogs) | Select-Object -Last 1
+    }
+    catch {
+        return $null
+    }
 }
 
 # --- qBittorrent Login Check (shared) ---
