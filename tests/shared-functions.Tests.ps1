@@ -15,6 +15,18 @@ Describe "Compose service state helpers" {
         . "$PSScriptRoot/../scripts/shared-functions.ps1"
     }
 
+    function Assert-Equal {
+        param(
+            $Actual,
+            $Expected,
+            [string]$Message
+        )
+
+        if ($Actual -ne $Expected) {
+            throw ("{0} Expected '{1}', got '{2}'." -f $Message, $Expected, $Actual)
+        }
+    }
+
     AfterEach {
         if (Test-Path Function:\global:docker) {
             Remove-Item Function:\global:docker -Force
@@ -29,8 +41,8 @@ Describe "Compose service state helpers" {
 
         $state = Get-ComposeServiceState -ServiceName 'qbittorrent'
 
-        $state.Exists | Should Be $false
-        $state.DisplayStatus | Should Be 'not found'
+        Assert-Equal -Actual $state.Exists -Expected $false -Message 'Exists flag mismatch.'
+        Assert-Equal -Actual $state.DisplayStatus -Expected 'not found' -Message 'DisplayStatus mismatch.'
     }
 
     It "Falls back to lifecycle status when health is unavailable" {
@@ -43,9 +55,9 @@ Describe "Compose service state helpers" {
         $state = Get-ComposeServiceState -ServiceName 'qbittorrent'
         $healthMap = Get-ComposeServiceHealthMap -ServiceNames @('qbittorrent')
 
-        $state.Exists | Should Be $true
-        $state.Lifecycle | Should Be 'created'
-        $state.Health | Should Be ''
-        $healthMap['qbittorrent'] | Should Be 'created'
+        Assert-Equal -Actual $state.Exists -Expected $true -Message 'Exists flag mismatch.'
+        Assert-Equal -Actual $state.Lifecycle -Expected 'created' -Message 'Lifecycle mismatch.'
+        Assert-Equal -Actual $state.Health -Expected '' -Message 'Health mismatch.'
+        Assert-Equal -Actual $healthMap['qbittorrent'] -Expected 'created' -Message 'Health map mismatch.'
     }
 }
