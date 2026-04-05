@@ -6,7 +6,11 @@ param(
     [string]$OutputPath = '',
     [switch]$Follow,
     [switch]$VerboseAuth,
-    [switch]$DebugOutput
+    [switch]$DebugOutput,
+    [ValidateSet('off','auto','always')]
+    [string]$ExternalLogMode = 'off',
+    [ValidateRange(0, 365)]
+    [int]$ExternalLogRetentionDays = 14
 )
 
 # Dot-source shared functions for dynamic table and utilities
@@ -28,7 +32,7 @@ $CommandDescriptions = [ordered]@{
 }
 
 function Show-CommandUsage {
-    Write-Host "`n[Usage] pwsh ./scripts/torrents-stack.ps1 <command> [-Service <name>] [-Follow] [-VerboseAuth]" -ForegroundColor Yellow
+    Write-Host "`n[Usage] pwsh ./scripts/torrents-stack.ps1 <command> [-Service <name>] [-Follow] [-VerboseAuth] [-ExternalLogMode off|auto|always] [-ExternalLogRetentionDays <days>]" -ForegroundColor Yellow
     Write-Host "`nAvailable commands:" -ForegroundColor Yellow
     foreach ($cmd in $CommandDescriptions.Keys) {
         Write-Host ("  {0,-8} {1}" -f $cmd, $CommandDescriptions[$cmd]) -ForegroundColor Yellow
@@ -109,6 +113,12 @@ if (-not $PSBoundParameters.ContainsKey('Command') -or [string]::IsNullOrWhiteSp
     When used with 'status', prints extra authentication-check diagnostics.
 .PARAMETER DebugOutput
     Enables verbose debug output for troubleshooting.
+.PARAMETER ExternalLogMode
+    Controls wrapper progress log capture. 'off' disables external log files,
+    'auto' writes them only when the wrapped command exits non-zero, and
+    'always' always writes them.
+.PARAMETER ExternalLogRetentionDays
+    Removes managed wrapper progress logs older than this many days.
 .EXAMPLE
     pwsh ./scripts/torrents-stack.ps1 start
     pwsh ./scripts/torrents-stack.ps1 stop
@@ -130,8 +140,35 @@ if (-not $PSBoundParameters.ContainsKey('Command') -or [string]::IsNullOrWhiteSp
 
 # --- Function Definitions ---
 
+$startupEnvPath = Join-Path (Split-Path -Parent $PSScriptRoot) '.env'
+$startupEnvMap = Get-EnvMap -Path $startupEnvPath
+
+if (-not $PSBoundParameters.ContainsKey('ExternalLogMode')) {
+    $envExternalLogMode = Get-EnvOrDefault -EnvMap $startupEnvMap -Key 'STACK_EXTERNAL_LOG_MODE' -DefaultValue 'off'
+    if ($envExternalLogMode -notin @('off','auto','always')) {
+        throw ("Invalid STACK_EXTERNAL_LOG_MODE in .env: '{0}'. Use off, auto, or always." -f $envExternalLogMode)
+    }
+
+    $ExternalLogMode = $envExternalLogMode
+}
+
+if (-not $PSBoundParameters.ContainsKey('ExternalLogRetentionDays')) {
+    $envRetentionDays = Get-EnvOrDefault -EnvMap $startupEnvMap -Key 'STACK_EXTERNAL_LOG_RETENTION_DAYS' -DefaultValue '14'
+    $parsedRetentionDays = 0
+    if (-not [int]::TryParse($envRetentionDays, [ref]$parsedRetentionDays)) {
+        throw ("Invalid STACK_EXTERNAL_LOG_RETENTION_DAYS in .env: '{0}'. Use a whole number between 0 and 365." -f $envRetentionDays)
+    }
+    if ($parsedRetentionDays -lt 0 -or $parsedRetentionDays -gt 365) {
+        throw ("Invalid STACK_EXTERNAL_LOG_RETENTION_DAYS in .env: '{0}'. Use a whole number between 0 and 365." -f $envRetentionDays)
+    }
+
+    $ExternalLogRetentionDays = $parsedRetentionDays
+}
+
 $stackContext = Get-StackContext -ScriptRoot $PSScriptRoot
 $repoRoot = Resolve-Path $stackContext.RepoRoot
+$script:ExternalLogMode = $ExternalLogMode
+$script:ExternalLogRetentionDays = $ExternalLogRetentionDays
 Set-Location $repoRoot
 
 

@@ -542,6 +542,83 @@ function Get-TerminalHyperlink {
     return "${esc}]8;;$Url${esc}\$Text${esc}]8;;${esc}\"
 }
 
+function Get-ExternalLogMode {
+    $externalLogModeVar = Get-Variable -Scope Script -Name ExternalLogMode -ErrorAction SilentlyContinue
+    if ($null -ne $externalLogModeVar -and $externalLogModeVar.Value -in @('off','auto','always')) {
+        return [string]$externalLogModeVar.Value
+    }
+
+    return 'off'
+}
+
+function Get-ExternalLogRetentionDays {
+    $retentionDaysVar = Get-Variable -Scope Script -Name ExternalLogRetentionDays -ErrorAction SilentlyContinue
+    if ($null -ne $retentionDaysVar) {
+        return [int]$retentionDaysVar.Value
+    }
+
+    return 14
+}
+
+function Test-ManagedExternalLogFileName {
+    param([string]$FileName)
+
+    if ([string]::IsNullOrWhiteSpace($FileName)) {
+        return $false
+    }
+
+    return ($FileName -match '^(docker-progress|[a-z0-9-]+)-\d{8}-\d{6}\.log$')
+}
+
+function Test-ShouldWriteExternalLog {
+    param([int]$ExitCode = 0)
+
+    switch (Get-ExternalLogMode) {
+        'always' { return $true }
+        'auto' { return ($ExitCode -ne 0) }
+        default { return $false }
+    }
+}
+
+function Remove-StaleExternalLogs {
+    param([string]$LogDir)
+
+    $retentionDays = Get-ExternalLogRetentionDays
+    if ($retentionDays -lt 0 -or -not (Test-Path -LiteralPath $LogDir)) {
+        return
+    }
+
+    $cutoff = (Get-Date).AddDays(-1 * $retentionDays)
+    try {
+        Get-ChildItem -LiteralPath $LogDir -File -Filter '*.log' -ErrorAction Stop |
+            Where-Object { (Test-ManagedExternalLogFileName -FileName $_.Name) -and $_.LastWriteTime -lt $cutoff } |
+            Remove-Item -Force -ErrorAction Stop
+    }
+    catch {
+        Write-Host ("[Warning] Could not prune old external logs in {0}: {1}" -f $LogDir, $_.Exception.Message) -ForegroundColor Yellow
+    }
+}
+
+function Save-ExternalProgressLog {
+    param(
+        [string[]]$Lines,
+        [string]$LogFile,
+        [int]$ExitCode
+    )
+
+    if (-not (Test-ShouldWriteExternalLog -ExitCode $ExitCode)) {
+        return $false
+    }
+
+    $logDir = Split-Path -Parent $LogFile
+    if (-not (Test-Path -LiteralPath $logDir)) {
+        New-Item -ItemType Directory -Path $logDir | Out-Null
+    }
+
+    @($Lines) | Set-Content -LiteralPath $LogFile
+    return $true
+}
+
 function ConvertTo-ProgressRow {
     param([string]$Line)
 
@@ -613,10 +690,11 @@ function Show-DockerProgressTable {
     $tmpFile = [System.IO.Path]::GetTempFileName()
     $tmpErrFile = [System.IO.Path]::GetTempFileName()
     $logDir = Join-Path $PSScriptRoot '..' 'logs'
-    if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
+    Remove-StaleExternalLogs -LogDir $logDir
     $logFile = Join-Path $logDir ("docker-progress-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + ".log")
     $allProgressLines = @()
     $progressRows = [ordered]@{}
+    $wroteLog = $false
     try {
         $proc = Start-Process -FilePath "pwsh" -ArgumentList "-NoProfile", "-Command", $Command -RedirectStandardOutput $tmpFile -RedirectStandardError $tmpErrFile -NoNewWindow -PassThru
         $startTime = Get-Date
@@ -658,8 +736,7 @@ function Show-DockerProgressTable {
             }
         }
         $proc.WaitForExit()
-        # Write all progress lines to log file
-        $allProgressLines | Set-Content $logFile
+        $wroteLog = Save-ExternalProgressLog -Lines $allProgressLines -LogFile $logFile -ExitCode $proc.ExitCode
         # Final summary
         $elapsed = (Get-Date) - $startTime
         if ($progressRows.Count -gt 0) {
@@ -667,7 +744,9 @@ function Show-DockerProgressTable {
         }
         Write-Host ("`n[Docker Progress Complete] {0}" -f $Command) -ForegroundColor Cyan
         Write-Host ("Elapsed time: {0}" -f $elapsed.ToString("hh\:mm\:ss")) -ForegroundColor Yellow
-        Write-Host ("Progress log saved to: {0}" -f $logFile) -ForegroundColor Gray
+        if ($wroteLog) {
+            Write-Host ("Progress log saved to: {0}" -f $logFile) -ForegroundColor Gray
+        }
     } finally {
         if (Test-Path $tmpFile) { Remove-Item $tmpFile -Force }
         if (Test-Path $tmpErrFile) { Remove-Item $tmpErrFile -Force }
@@ -689,11 +768,12 @@ function Show-CommandProgressTable {
     $tmpFile = [System.IO.Path]::GetTempFileName()
     $tmpErrFile = [System.IO.Path]::GetTempFileName()
     $logDir = Join-Path $PSScriptRoot '..' 'logs'
-    if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
+    Remove-StaleExternalLogs -LogDir $logDir
     $logFile = Join-Path $logDir ("${LogPrefix}-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + ".log")
     $allLines = @()
     $progressRows = [ordered]@{}
     $startTime = Get-Date
+    $wroteLog = $false
     try {
         $proc = Start-Process -FilePath "pwsh" -ArgumentList "-NoProfile", "-Command", $Command -RedirectStandardOutput $tmpFile -RedirectStandardError $tmpErrFile -NoNewWindow -PassThru
         $lastLine = 0
@@ -740,15 +820,16 @@ function Show-CommandProgressTable {
             }
         }
         $proc.WaitForExit()
-        # Write all lines to log file
-        $allLines | Set-Content $logFile
+        $wroteLog = Save-ExternalProgressLog -Lines $allLines -LogFile $logFile -ExitCode $proc.ExitCode
         $elapsed = (Get-Date) - $startTime
         if ($progressRows.Count -gt 0) {
             Show-ProgressSnapshotTable -Rows $progressRows -Title ("Command Progress: {0}" -f $Command) -Elapsed $elapsed
         }
         Write-Host ("`n[Command Complete] {0}" -f $Command) -ForegroundColor Cyan
         Write-Host ("Elapsed time: {0}" -f $elapsed.ToString("hh\:mm\:ss")) -ForegroundColor Yellow
-        Write-Host ("Progress log saved to: {0}" -f $logFile) -ForegroundColor Gray
+        if ($wroteLog) {
+            Write-Host ("Progress log saved to: {0}" -f $logFile) -ForegroundColor Gray
+        }
     } finally {
         if (Test-Path $tmpFile) {
             try {

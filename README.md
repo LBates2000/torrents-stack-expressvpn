@@ -37,6 +37,8 @@ pwsh ./scripts/torrents-stack.ps1 start
 
 - `preflight` checks whether Docker is reachable before runtime operations.
 - `report` writes a sanitized stack test report under `logs/` without expanding secret values from `.env`.
+- Wrapper progress logs default to `-ExternalLogMode off`; use `-ExternalLogMode auto` to keep logs only when a wrapped command fails, or `-ExternalLogMode always` to always write them. Managed wrapper `.log` files older than `-ExternalLogRetentionDays` are pruned automatically.
+- You can set repo-local defaults in `.env` with `STACK_EXTERNAL_LOG_MODE=off|auto|always` and `STACK_EXTERNAL_LOG_RETENTION_DAYS=<0-365>`. CLI flags still take precedence.
 
 ## Secrets handling
 - Keep real secrets only in local `.env`; do not commit them to git.
