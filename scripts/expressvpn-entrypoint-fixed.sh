@@ -122,14 +122,16 @@ if ! connect_with_retries; then
   exit 1
 fi
 
+final_state=""
 for _ in {1..20}; do
-  if [ "$(expressvpnctl get connectionstate)" = "Connected" ]; then
+  final_state="$(expressvpnctl get connectionstate 2>/dev/null || true)"
+  if [ "$final_state" = "Connected" ]; then
     break
   fi
   sleep 1
 done
 
-if [ "$(expressvpnctl get connectionstate)" != "Connected" ]; then
+if [ "$final_state" != "Connected" ]; then
   expressvpnctl set networklock true
   exit 1
 fi
