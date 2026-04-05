@@ -318,6 +318,65 @@ function Show-ServiceEndpoints {
     }
 }
 
+function ConvertTo-ServiceStatusMap {
+    param([hashtable]$StateMap)
+
+    $statusMap = @{}
+    foreach ($serviceName in $StateMap.Keys) {
+        $statusMap[$serviceName] = $StateMap[$serviceName].DisplayStatus
+    }
+
+    return $statusMap
+}
+
+function Test-AllServicesHealthy {
+    param(
+        [hashtable]$StateMap,
+        [string[]]$ServiceNames
+    )
+
+    return (@($ServiceNames | Where-Object { $StateMap[$_].DisplayStatus -ne 'healthy' }).Count -eq 0)
+}
+
+function Show-ServiceDiagnostics {
+    param(
+        [hashtable]$StateMap,
+        [string[]]$ServiceNames
+    )
+
+    foreach ($serviceName in $ServiceNames) {
+        $state = $StateMap[$serviceName]
+        Write-Host ("[Diagnosis] {0}: lifecycle={1}; health={2}; container={3}" -f $serviceName, $state.Lifecycle, $(if ([string]::IsNullOrWhiteSpace($state.Health)) { 'n/a' } else { $state.Health }), $(if ([string]::IsNullOrWhiteSpace($state.ContainerId)) { 'n/a' } else { $state.ContainerId })) -ForegroundColor Magenta
+        if (-not $state.Exists) {
+            Write-Host '  Container not found.' -ForegroundColor Yellow
+            continue
+        }
+
+        $healthLog = Get-ComposeServiceLatestHealthLog -ServiceName $serviceName
+        if ($null -ne $healthLog) {
+            Write-Host ("  Last healthcheck exit code: {0}" -f $healthLog.ExitCode)
+            Write-Host ("  Last healthcheck output: {0}" -f $healthLog.Output.Trim())
+            continue
+        }
+
+        Write-Host '  No healthcheck log available for the current container state.' -ForegroundColor Yellow
+    }
+}
+
+function Invoke-QbittorrentBootstrapRepair {
+    $runningServices = @(docker compose ps --status running --services)
+    if ($runningServices -notcontains 'qbittorrent') {
+        Write-Host '[Recovery] qBittorrent bootstrap repair skipped: service is not running.' -ForegroundColor Yellow
+        return
+    }
+
+    Write-Host '[Recovery] Reapplying qBittorrent runtime bootstrap...' -ForegroundColor Cyan
+    & docker compose exec -T qbittorrent bash /tmp/bootstrap-qbittorrent-jackett.sh
+    if ($LASTEXITCODE -ne 0) {
+        throw 'qBittorrent bootstrap repair failed.'
+    }
+}
+
 
 function Start-Stack {
     param([hashtable]$SyncStatus)
@@ -332,42 +391,44 @@ function Start-Stack {
     Show-CommandProgressTable -Command 'docker compose up -d' -LogPrefix 'docker-up'
     Invoke-StartRefreshPlan -SyncStatus $SyncStatus -RunningServicesBeforeStart $runningServicesBeforeStart -ExpressvpnRefreshNeeded:$expressvpnRefreshNeeded
     $services = @('expressvpn','flaresolverr','jackett','qbittorrent')
+    $dependencyServices = @('expressvpn','flaresolverr','jackett')
     $maxWait = 600 # seconds (10 minutes)
     $interval = 5  # seconds
     $startTime = Get-Date
+    $qbittorrentRecoveryAttempted = $false
     while ($true) {
-        $serviceStatus = Get-ComposeServiceHealthMap -ServiceNames $services
-        $allHealthy = (@($services | Where-Object { $serviceStatus[$_] -ne 'healthy' }).Count -eq 0)
+        $serviceStateMap = Get-ComposeServiceStateMap -ServiceNames $services
+        $serviceStatus = ConvertTo-ServiceStatusMap -StateMap $serviceStateMap
+        $allHealthy = Test-AllServicesHealthy -StateMap $serviceStateMap -ServiceNames $services
+        $dependenciesHealthy = Test-AllServicesHealthy -StateMap $serviceStateMap -ServiceNames $dependencyServices
+
+        if (-not $qbittorrentRecoveryAttempted -and $dependenciesHealthy) {
+            $qbittorrentStatus = $serviceStateMap['qbittorrent'].DisplayStatus
+            if ($qbittorrentStatus -in @('created','exited','not found')) {
+                Write-Host ("[Recovery] qBittorrent is '{0}' after dependency services became healthy; retrying startup..." -f $qbittorrentStatus) -ForegroundColor Yellow
+                Show-CommandProgressTable -Command 'docker compose up -d qbittorrent' -LogPrefix 'qbittorrent-recover'
+                $qbittorrentRecoveryAttempted = $true
+                continue
+            }
+        }
+
         Show-ServiceStatusTable -serviceStatus $serviceStatus -services $services
         if ($allHealthy) { break }
         if ((Get-Date) - $startTime -gt ([TimeSpan]::FromSeconds($maxWait))) {
             Write-Host "[Health] Timeout waiting for all services to become healthy." -ForegroundColor Red
-            $unhealthy = $services | Where-Object { $serviceStatus[$_] -ne 'healthy' }
+            $unhealthy = $services | Where-Object { $serviceStateMap[$_].DisplayStatus -ne 'healthy' }
             if ($null -eq $unhealthy -or $unhealthy -eq '') { $unhealthy = @() } else { $unhealthy = @($unhealthy) }
             if (@($unhealthy).Count -gt 0) {
                 Write-Host ("[Diagnosis] The following service(s) are not healthy: {0}" -f ($unhealthy -join ", ")) -ForegroundColor Yellow
-                foreach ($svc in $unhealthy) {
-                    Write-Host ("[Diagnosis] Last healthcheck log for ${svc}:") -ForegroundColor Magenta
-                    $cid = docker ps -a --filter "name=$svc" --format "{{.ID}}"
-                    if ($cid) {
-                        $log = docker inspect --format='{{json .State.Health.Log}}' $cid | ConvertFrom-Json | Select-Object -Last 1
-                        if ($log) {
-                            Write-Host ("  ExitCode: $($log.ExitCode)")
-                            Write-Host ("  Output: $($log.Output.Trim())")
-                            Write-Host ("  End: $($log.End)\n")
-                        } else {
-                            Write-Host "  No healthcheck log found."
-                        }
-                    } else {
-                        Write-Host "  Container not found."
-                    }
-                }
+                Show-ServiceDiagnostics -StateMap $serviceStateMap -ServiceNames $unhealthy
                 Write-Host "[Diagnosis] To debug further, run: docker logs <container> or manually run the healthcheck script inside the container." -ForegroundColor Cyan
             }
-            break
+            throw 'Timed out waiting for the stack to become healthy.'
         }
         Start-Sleep -Seconds $interval
     }
+
+    Invoke-QbittorrentBootstrapRepair
     Show-Stack-Status
     Show-Recent-Logs -Since $logsSince
 
@@ -379,6 +440,7 @@ function Start-Stack {
     if (@($missing).Count -gt 0) {
         Write-Host ("[Diagnosis] Warning: Not all expected containers are running: {0}" -f ($missing -join ", ")) -ForegroundColor Yellow
         Get-StackReport
+        throw ("Not all expected containers are running: {0}" -f ($missing -join ', '))
     }
 }
 
@@ -907,13 +969,17 @@ function Invoke-TimedCommand {
         [string]$CommandName,
         [string]$StartMessage,
         [scriptblock]$Action,
-        [string]$DoneMessage
+        [string]$DoneMessage,
+        [scriptblock]$BeforeTimingAction
     )
 
     $cmdStart = Get-Date
     Write-Host $StartMessage -ForegroundColor Cyan
     & $Action
     Write-Host $DoneMessage -ForegroundColor Green
+    if ($null -ne $BeforeTimingAction) {
+        & $BeforeTimingAction
+    }
     $cmdEnd = Get-Date
     Write-Host ("[Timing] Elapsed time for '{0}': {1}" -f $CommandName, ($cmdEnd - $cmdStart)) -ForegroundColor Yellow
 }
@@ -1014,11 +1080,12 @@ function Test-Stack-All {
 }
 switch ($Command) {
     'start' {
-        Invoke-TimedCommand -CommandName 'start' -StartMessage '[Command] Starting stack...' -DoneMessage '[Command] Stack start complete.' -Action {
+        Invoke-TimedCommand -CommandName 'start' -StartMessage '[Command] Starting stack...' -DoneMessage '[Command] Stack start complete.' -BeforeTimingAction {
+            Show-ServiceEndpoints
+        } -Action {
             Assert-DockerDaemonAvailable -CommandName 'start'
             $syncStatus = Sync-Configs
             Start-Stack -SyncStatus $syncStatus
-            Show-ServiceEndpoints
         }
     }
     'stop' {
@@ -1027,15 +1094,29 @@ switch ($Command) {
             Stop-Stack
         }
     }
+    'restart' {
+        Invoke-TimedCommand -CommandName 'restart' -StartMessage '[Command] Restarting stack...' -DoneMessage '[Command] Stack restart complete.' -BeforeTimingAction {
+            Show-ServiceEndpoints
+        } -Action {
+            Assert-DockerDaemonAvailable -CommandName 'restart'
+            Stop-Stack
+            $syncStatus = Sync-Configs
+            Start-Stack -SyncStatus $syncStatus
+        }
+    }
     'rebuild' {
-        Invoke-TimedCommand -CommandName 'rebuild' -StartMessage '[Command] Rebuilding stack (full reset)...' -DoneMessage '[Command] Stack rebuild complete.' -Action {
+        Invoke-TimedCommand -CommandName 'rebuild' -StartMessage '[Command] Rebuilding stack (full reset)...' -DoneMessage '[Command] Stack rebuild complete.' -BeforeTimingAction {
+            Show-ServiceEndpoints
+        } -Action {
             Assert-DockerDaemonAvailable -CommandName 'rebuild'
             Invoke-StackClean
             Reset-Stack
         }
     }
     'update' {
-        Invoke-TimedCommand -CommandName 'update' -StartMessage '[Command] Updating stack images and services...' -DoneMessage '[Command] Stack update complete.' -Action {
+        Invoke-TimedCommand -CommandName 'update' -StartMessage '[Command] Updating stack images and services...' -DoneMessage '[Command] Stack update complete.' -BeforeTimingAction {
+            Show-ServiceEndpoints
+        } -Action {
             Assert-DockerDaemonAvailable -CommandName 'update'
             Update-Images
             $syncStatus = Sync-Configs
