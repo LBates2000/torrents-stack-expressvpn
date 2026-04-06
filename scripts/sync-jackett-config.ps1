@@ -92,7 +92,6 @@ $propertyMappings = @(
     @{ Property = 'AllowExternal'; Env = 'JACKETT_CFG_ALLOW_EXTERNAL'; Default = 'true'; Kind = 'bool' },
     @{ Property = 'AllowCORS'; Env = 'JACKETT_CFG_ALLOW_CORS'; Default = 'false'; Kind = 'bool' },
     @{ Property = 'APIKey'; Env = 'JACKETT_CFG_API_KEY'; Default = 'null'; Kind = 'string' },
-    @{ Property = 'AdminPassword'; Env = 'JACKETT_CFG_ADMIN_PASSWORD'; Default = 'null'; Kind = 'string' },
     @{ Property = 'InstanceId'; Env = 'JACKETT_CFG_INSTANCE_ID'; Default = 'null'; Kind = 'string' },
     @{ Property = 'BlackholeDir'; Env = 'JACKETT_CFG_BLACKHOLE_DIR'; Default = $defaultBlackholeDir; Kind = 'string' },
     @{ Property = 'UpdateDisabled'; Env = 'JACKETT_CFG_UPDATE_DISABLED'; Default = 'false'; Kind = 'bool' },
@@ -127,6 +126,21 @@ if (-not [string]::IsNullOrWhiteSpace($originalJson)) {
 foreach ($mapping in $propertyMappings) {
     $rawValue = Get-EnvOrDefault -EnvMap $envMap -Key $mapping.Env -DefaultValue $mapping.Default
     $config[$mapping.Property] = Convert-EnvValue -Value $rawValue -Kind $mapping.Kind
+}
+
+$rawAdminPassword = Get-EnvOrDefault -EnvMap $envMap -Key 'JACKETT_CFG_ADMIN_PASSWORD' -DefaultValue 'null'
+$adminPassword = Convert-EnvValue -Value $rawAdminPassword -Kind 'string'
+
+if ($null -eq $adminPassword) {
+    $config['AdminPassword'] = $null
+}
+else {
+    $apiKey = $config['APIKey']
+    if ([string]::IsNullOrWhiteSpace($apiKey)) {
+        throw 'JACKETT_CFG_ADMIN_PASSWORD requires JACKETT_CFG_API_KEY to be set to a stable non-empty value in .env so the Jackett config hash can be generated.'
+    }
+
+    $config['AdminPassword'] = Get-JackettAdminPasswordHash -Password $adminPassword -ApiKey $apiKey
 }
 
 $json = $config | ConvertTo-Json -Depth 10

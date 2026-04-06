@@ -158,6 +158,9 @@ docker compose up --force-recreate -d
 - `jackett` now bootstraps `ServerConfig.json` from `.env` values (`JACKETT_CFG_*`) at container startup.
 - Defaults match the existing `ServerConfig.json` values.
 - `JACKETT_CFG_API_KEY` and `JACKETT_CFG_INSTANCE_ID` default to `null` (auto-generated), but can be set to static values for persistence.
+- `JACKETT_CFG_ADMIN_PASSWORD` is treated as plaintext input in `.env`, but the sync script writes Jackett's required salted SHA512 hash to `ServerConfig.json`.
+- If `JACKETT_CFG_ADMIN_PASSWORD` is set, `JACKETT_CFG_API_KEY` must also be set to a stable non-empty value so the password hash can be generated correctly.
+- Jackett's current Web UI login is password-only, so `JACKETT_CFG_ADMIN_USERNAME` is intentionally unsupported and should not be added to `.env`.
 - `JACKETT_CFG_BLACKHOLE_DIR` defaults to `CONTAINER_DOWNLOADS_DIR/watch`.
 - `JACKETT_CFG_OMDB_API_URL` defaults to `https://www.omdbapi.com/`.
 - `JACKETT_CFG_FLARESOLVERR_URL` defaults to `http://flaresolverr:8191` (service-name routing on the compose network).

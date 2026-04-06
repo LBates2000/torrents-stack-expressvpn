@@ -60,6 +60,13 @@ foreach ($key in $required) {
     }
 }
 
+$jackettAdminPassword = Get-EnvOrDefault -EnvMap $envMap -Key 'JACKETT_CFG_ADMIN_PASSWORD' -DefaultValue ''
+$jackettApiKey = Get-EnvOrDefault -EnvMap $envMap -Key 'JACKETT_CFG_API_KEY' -DefaultValue ''
+
+if (-not [string]::IsNullOrWhiteSpace($jackettAdminPassword) -and $jackettAdminPassword -ne 'null' -and [string]::IsNullOrWhiteSpace($jackettApiKey)) {
+    $errors += "$([System.IO.Path]::GetFileName($envSourcePath)) requires JACKETT_CFG_API_KEY when JACKETT_CFG_ADMIN_PASSWORD is set."
+}
+
 Test-JsonObjectValue -Key 'QBITTORRENT_CFG_CATEGORIES_JSON' -RawValue $envMap['QBITTORRENT_CFG_CATEGORIES_JSON'] -Errors ([ref]$errors)
 Test-JsonObjectValue -Key 'QBITTORRENT_CFG_WATCHED_FOLDERS_JSON' -RawValue $envMap['QBITTORRENT_CFG_WATCHED_FOLDERS_JSON'] -Errors ([ref]$errors)
 

@@ -136,6 +136,28 @@ function Get-EnvOrDefault {
     return $DefaultValue
 }
 
+function Get-JackettAdminPasswordHash {
+    param(
+        [AllowNull()]
+        [string]$Password,
+        [AllowNull()]
+        [string]$ApiKey
+    )
+
+    if ($null -eq $Password) {
+        return $null
+    }
+
+    if ([string]::IsNullOrWhiteSpace($ApiKey)) {
+        throw 'Jackett admin password hashing requires a non-empty API key.'
+    }
+
+    $unicode = [System.Text.UnicodeEncoding]::new()
+    $bytes = $unicode.GetBytes($Password + $ApiKey)
+    $hash = [System.Security.Cryptography.SHA512]::Create().ComputeHash($bytes)
+    return -join ($hash | ForEach-Object { $_.ToString('x2') })
+}
+
 function Get-StackContext {
     param(
         [string]$ScriptRoot = $PSScriptRoot
