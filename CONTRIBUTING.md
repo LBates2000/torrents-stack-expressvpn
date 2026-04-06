@@ -9,6 +9,8 @@ Thanks for contributing to this project.
 - Keep changes focused and small.
 - Install local lint dependencies once per machine:
   - `Install-Module PSScriptAnalyzer -Scope CurrentUser -Force -AllowClobber`
+- Install the required Pester version for local test runs:
+  - `Install-Module Pester -Scope CurrentUser -Force -SkipPublisherCheck -RequiredVersion 5.7.1`
 - Run local checks before opening a PR:
   - `git hook run pre-commit`
   - `docker compose config`

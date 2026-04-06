@@ -19,7 +19,6 @@ jobs:
         shell: pwsh
         run: |
           Set-PSRepository PSGallery -InstallationPolicy Trusted
-          if (-not (Get-Module -ListAvailable -Name Pester)) {
-            Install-Module Pester -Scope CurrentUser -Force -SkipPublisherCheck
-          }
-          Invoke-Pester ./tests/shared-functions.Tests.ps1
+          Install-Module Pester -Scope CurrentUser -Force -SkipPublisherCheck -RequiredVersion 5.7.1
+          Import-Module Pester -RequiredVersion 5.7.1 -Force
+          Invoke-Pester ./tests
