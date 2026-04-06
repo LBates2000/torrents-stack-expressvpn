@@ -784,6 +784,22 @@ function Get-ComposeRenderText {
     return (@($composeOutput) -join [Environment]::NewLine)
 }
 
+function Invoke-RepoPesterTests {
+    $testPath = Join-Path $repoRoot 'tests'
+    $testFiles = @()
+    if (Test-Path -LiteralPath $testPath) {
+        $testFiles = @(Get-ChildItem -LiteralPath $testPath -Filter '*.Tests.ps1' -File | Sort-Object -Property Name | ForEach-Object { $_.Name })
+    }
+    $output = @(pwsh -NoProfile -Command "Invoke-Pester -Path './tests'" 2>&1)
+
+    return [pscustomobject]@{
+        Output = $output
+        ExitCode = $LASTEXITCODE
+        TestPath = $testPath
+        TestFiles = $testFiles
+    }
+}
+
 function Test-ComposeGoalAlignment {
     param([string]$ComposeRenderText)
 
@@ -865,8 +881,10 @@ function Export-StackTestReport {
 
     $validateOutput = @(pwsh -NoProfile -File (Join-Path $PSScriptRoot 'validate-config.ps1') 2>&1)
     $validateExitCode = $LASTEXITCODE
-    $pesterOutput = @(pwsh -NoProfile -Command "Invoke-Pester ./tests/shared-functions.Tests.ps1" 2>&1)
-    $pesterExitCode = $LASTEXITCODE
+    $pesterResult = Invoke-RepoPesterTests
+    $pesterOutput = $pesterResult.Output
+    $pesterExitCode = $pesterResult.ExitCode
+    $pesterTestFiles = @($pesterResult.TestFiles)
 
     $dockerAvailable = Test-DockerDaemonAvailable
     $composePsOutput = @()
@@ -901,7 +919,7 @@ function Export-StackTestReport {
         '2. `pwsh ./scripts/validate-config.ps1`',
         '3. `docker compose config --no-interpolate`',
         '4. `docker compose ps`',
-        '5. `Invoke-Pester ./tests/shared-functions.Tests.ps1`',
+        '5. `Invoke-Pester -Path ./tests`',
         '',
         '## Results',
         '',
@@ -923,7 +941,14 @@ function Export-StackTestReport {
         '',
         ('- `validate-config.ps1` exit code: `{0}`' -f $validateExitCode),
         ('- `validate-config.ps1` summary: `{0}`' -f ((@($validateOutput) | Select-Object -Last 1) -join '').Trim()),
-        ('- Pester exit code: `{0}`' -f $pesterExitCode),
+        ('- Pester exit code: `{0}`' -f $pesterExitCode)
+    )
+
+    if ($pesterTestFiles.Count -gt 0) {
+        $lines += ('- Pester test files: `{0}`' -f ($pesterTestFiles -join ', '))
+    }
+
+    $lines += @(
         ('- Pester summary: `{0}`' -f ((@($pesterOutput) | Select-Object -Last 2 | Select-Object -First 1) -join '').Trim()),
         '',
         '### Goal alignment confirmed from compose render',
@@ -1050,6 +1075,8 @@ function Test-Stack-All {
     $stepResults = @{}
     # Define steps and their dependencies (by name)
     $steps = @(
+        @{ Name = 'Validate config'; Action = { & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'validate-config.ps1'); if ($LASTEXITCODE -ne 0) { throw 'validate-config.ps1 failed.' } }; DependsOn = @() },
+        @{ Name = 'Pester';        Action = { $pesterResult = Invoke-RepoPesterTests; @($pesterResult.Output) | ForEach-Object { Write-Host $_ }; if ($pesterResult.ExitCode -ne 0) { throw 'Invoke-Pester failed.' } }; DependsOn = @('Validate config') },
         @{ Name = 'Clean (start)'; Action = { Remove-StackWithVolumes; Clear-DockerUnused }; DependsOn = @() },
         @{ Name = 'Start';         Action = { $syncStatus = Sync-Configs; Start-Stack -SyncStatus $syncStatus }; DependsOn = @('Clean (start)') },
         @{ Name = 'Status';        Action = { Show-Status }; DependsOn = @('Start') },

@@ -10,6 +10,35 @@ Describe "Write-ProgressLine" {
     }
 }
 
+Describe "Jackett password hashing" {
+    BeforeAll {
+        . "$PSScriptRoot/../scripts/shared-functions.ps1"
+    }
+
+    It "Matches Jackett's salted SHA512 format" {
+        $hash = Get-JackettAdminPasswordHash -Password 'temp03202026' -ApiKey 'cwgfqc90uk7fu634md5k8eoqgmp7ycor'
+
+        if ($hash -ne 'f7132d32188a9aabda4e402717e116fd4082369e192e992062c466aa008b52605038b821d92306c042ad414532d8dcfb0710ccb0d7ad4b8a4ac66afef2c36ab1') {
+            throw 'Jackett admin password hash did not match the expected salted SHA512 value.'
+        }
+    }
+
+    It "Rejects hashing without an API key" {
+        $threw = $false
+
+        try {
+            Get-JackettAdminPasswordHash -Password 'password' -ApiKey $null
+        }
+        catch {
+            $threw = $true
+        }
+
+        if (-not $threw) {
+            throw 'Expected Jackett admin password hashing without an API key to throw.'
+        }
+    }
+}
+
 Describe "Compose service state helpers" {
     BeforeAll {
         . "$PSScriptRoot/../scripts/shared-functions.ps1"
