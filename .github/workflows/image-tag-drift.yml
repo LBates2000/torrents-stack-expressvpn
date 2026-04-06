@@ -1,8 +1,6 @@
 name: Image Tag Drift Check
 
 on:
-  schedule:
-    - cron: "0 15 1 * *"
   workflow_dispatch:
 
 permissions:
@@ -44,17 +42,17 @@ jobs:
           def normalize(value):
               return value.strip().lstrip("v")
 
-            def inspect_image(image_ref):
+          def inspect_image(image_ref):
               inspect = run(["docker", "image", "inspect", image_ref])
               data = json.loads(inspect.stdout)[0]
               labels = data.get("Config", {}).get("Labels") or {}
               repo_digests = data.get("RepoDigests") or []
               digest = ""
               if repo_digests:
-                digest = repo_digests[0].split("@", 1)[1]
+                  digest = repo_digests[0].split("@", 1)[1]
               return {
-                "version": (labels.get("org.opencontainers.image.version") or "").strip(),
-                "digest": digest,
+                  "version": (labels.get("org.opencontainers.image.version") or "").strip(),
+                  "digest": digest,
               }
 
           env = load_env(ENV_FILE)
@@ -89,27 +87,27 @@ jobs:
                   })
                   continue
 
-                run(["docker", "pull", f"{image}:latest"])
-                latest_meta = inspect_image(f"{image}:latest")
-                latest_version = latest_meta["version"] or "latest"
-                latest_digest = latest_meta["digest"]
+              run(["docker", "pull", f"{image}:latest"])
+              latest_meta = inspect_image(f"{image}:latest")
+              latest_version = latest_meta["version"] or "latest"
+              latest_digest = latest_meta["digest"]
 
-                run(["docker", "pull", f"{image}:{pinned}"])
-                pinned_meta = inspect_image(f"{image}:{pinned}")
-                pinned_digest = pinned_meta["digest"]
+              run(["docker", "pull", f"{image}:{pinned}"])
+              pinned_meta = inspect_image(f"{image}:{pinned}")
+              pinned_digest = pinned_meta["digest"]
 
-                version_matches = normalize(pinned) == normalize(latest_version)
-                digest_matches = bool(latest_digest and pinned_digest and latest_digest == pinned_digest)
+              version_matches = normalize(pinned) == normalize(latest_version)
+              digest_matches = bool(latest_digest and pinned_digest and latest_digest == pinned_digest)
 
-                if not version_matches and not digest_matches:
+              if not version_matches and not digest_matches:
                   latest_reference = latest_version
                   if latest_reference == "latest" and latest_digest:
-                    latest_reference = latest_digest
+                      latest_reference = latest_digest
                   outdated.append({
                       "service": service,
                       "env_key": env_key,
                       "pinned": pinned,
-                    "latest": latest_reference,
+                      "latest": latest_reference,
                       "reason": "Configured tag differs from latest image version",
                   })
 

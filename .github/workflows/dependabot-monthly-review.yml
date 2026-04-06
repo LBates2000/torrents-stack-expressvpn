@@ -1,8 +1,6 @@
 name: Dependabot Monthly Review
 
 on:
-  schedule:
-    - cron: "0 16 1 * *"
   workflow_dispatch:
 
 permissions:
