@@ -2,6 +2,17 @@
 
 set -euo pipefail
 
+BOOTSTRAP_ENV_PATH="${QBITTORRENT_BOOTSTRAP_ENV_PATH:-/config/qBittorrent/bootstrap.env}"
+if [ -f "${BOOTSTRAP_ENV_PATH}" ]; then
+  BOOTSTRAP_ENV_TMP="$(mktemp)"
+  tr -d '\r' < "${BOOTSTRAP_ENV_PATH}" > "${BOOTSTRAP_ENV_TMP}"
+  set -a
+  # shellcheck source=/dev/null
+  . "${BOOTSTRAP_ENV_TMP}"
+  set +a
+  rm -f "${BOOTSTRAP_ENV_TMP}"
+fi
+
 QBITTORRENT_CONFIG_DIR="${QBITTORRENT_CONFIG_DIR:-/config/qBittorrent}"
 QBITTORRENT_CONF="${QBITTORRENT_CONF:-${QBITTORRENT_CONFIG_DIR}/qBittorrent.conf}"
 ENGINES_DIR="${QBITTORRENT_ENGINES_DIR:-${QBITTORRENT_CONFIG_DIR}/nova3/engines}"
@@ -159,43 +170,6 @@ EOF
     echo "QBITTORRENT_JACKETT_API_KEY=$JACKETT_API_KEY" >> "$QBITTORRENT_CONF"
   fi
   echo "[qbittorrent-bootstrap] Synced QBITTORRENT_JACKETT_API_KEY to $QBITTORRENT_CONF"
-fi
-
-# Set qBittorrent WebUI password hash if QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT is set
-if [ -n "${QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT:-}" ]; then
-  echo "[qbittorrent-bootstrap] Attempting to set WebUI password hash from QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT..."
-  if command -v python3 >/dev/null 2>&1; then
-    TMP_PY_SCRIPT="/tmp/qb_webui_hash.py"
-    cat > "$TMP_PY_SCRIPT" <<'EOF'
-import os, base64, hashlib
-password = os.environ.get('QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT')
-assert password, 'No password in env'
-salt = os.urandom(16)
-dk = hashlib.pbkdf2_hmac('sha512', password.encode('utf-8'), salt, 100000, dklen=64)
-out = '@ByteArray({}:{})'.format(
-    base64.b64encode(salt).decode(),
-    base64.b64encode(dk).decode()
-)
-print('WebUI\\Password_PBKDF2=' + out)
-EOF
-    HASH_LINE=$(python3 "$TMP_PY_SCRIPT")
-    rm -f "$TMP_PY_SCRIPT"
-    echo "[qbittorrent-bootstrap] Generated hash line: $HASH_LINE"
-    # Remove any old WebUI password lines
-    sed -i '/^WebUI\\Password_ha1=/d' "$QBITTORRENT_CONF"
-    sed -i '/^WebUI\\Password_PBKDF2=/d' "$QBITTORRENT_CONF"
-    # Ensure [Preferences] section exists
-    if ! grep -q '^\[Preferences\]' "$QBITTORRENT_CONF" 2>/dev/null; then
-      echo "[Preferences]" >> "$QBITTORRENT_CONF"
-    fi
-    # Insert password line after [Preferences] section
-    awk -v line="$HASH_LINE" 'BEGIN{added=0} /^\[Preferences\]/{print; if(!added){print line; added=1}; next} 1' "$QBITTORRENT_CONF" > "$QBITTORRENT_CONF.tmp" && mv "$QBITTORRENT_CONF.tmp" "$QBITTORRENT_CONF"
-    echo "[qbittorrent-bootstrap] Set WebUI password hash in $QBITTORRENT_CONF from QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT"
-  else
-    echo "[qbittorrent-bootstrap] WARN: python3 not available, cannot set WebUI password hash from QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT"
-  fi
-else
-  echo "[qbittorrent-bootstrap] QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT not set or empty inside the container, skipping WebUI password hash."
 fi
 
 apply_download_preferences
