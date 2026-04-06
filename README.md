@@ -36,9 +36,20 @@ pwsh ./scripts/torrents-stack.ps1 start
 ```
 
 - `preflight` checks whether Docker is reachable before runtime operations.
+- `test-all` is a destructive end-to-end wrapper sequence: it validates config, runs Pester, exercises lifecycle commands, and finishes with `stop` plus `clean`.
 - `report` writes a sanitized stack test report under `logs/` without expanding secret values from `.env`.
 - Wrapper progress logs default to `-ExternalLogMode off`; use `-ExternalLogMode auto` to keep logs only when a wrapped command fails, or `-ExternalLogMode always` to always write them. Managed wrapper `.log` files older than `-ExternalLogRetentionDays` are pruned automatically.
 - You can set repo-local defaults in `.env` with `STACK_EXTERNAL_LOG_MODE=off|auto|always` and `STACK_EXTERNAL_LOG_RETENTION_DAYS=<0-365>`. CLI flags still take precedence.
+
+Project close workflow:
+```
+pwsh ./scripts/torrents-stack.ps1 test-all
+pwsh ./scripts/torrents-stack.ps1 report
+```
+
+- The generated report reflects current runtime state at report time.
+- If you run `report` immediately after `test-all`, expect no running services in the compose state section because the test sequence intentionally cleans up at the end.
+- If you need live endpoint checks in the report after a full sequence, run `pwsh ./scripts/torrents-stack.ps1 start` before `report`.
 
 ## Secrets handling
 - Keep real secrets only in local `.env`; do not commit them to git.
@@ -172,9 +183,10 @@ docker compose up --force-recreate -d
 ### qBittorrent config via env
 - Use `.env` values (`QBITTORRENT_CFG_*`) to manage `configs/qBittorrent/qBittorrent.conf`.
 - Optional: set `QBITTORRENT_CFG_WEBUI_PASSWORD_PBKDF2` to enforce the WebUI admin password hash via `.env`.
-- Optional: set `QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT` to generate `WebUI\Password_PBKDF2` automatically during sync (PBKDF2 value wins if both are set).
+- Optional: set `QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT` to generate `WebUI\Password_PBKDF2` automatically during sync and to authenticate the startup Web API save-path sync.
 - Use `QBITTORRENT_CFG_CATEGORIES_JSON` to populate `configs/qBittorrent/categories.json`.
 - Use `QBITTORRENT_CFG_WATCHED_FOLDERS_JSON` to populate `configs/qBittorrent/watched_folders.json`.
+- Sync also writes `configs/qBittorrent/bootstrap.env`, which the container startup script sources so LinuxServer init does not drop qBittorrent bootstrap settings.
 - On startup, `qbittorrent` also reapplies `save_path` and `temp_path` through the Web API so completed and incomplete downloads stay under `CONTAINER_DOWNLOADS_DIR` instead of drifting back to `/config/Downloads`.
 - On startup, `qbittorrent` bootstraps the Jackett search plugin under `configs/qBittorrent/nova3/engines`:
 	- Installs `jackett.py` automatically (if missing) from `QBITTORRENT_JACKETT_PLUGIN_URL`.
@@ -184,11 +196,11 @@ docker compose up --force-recreate -d
   - Categories: `movies -> <SavePath>/movies`, `tv -> <SavePath>/tv`
   - Watched folders: `<SavePath>/watch/movies` and `<SavePath>/watch/tv`
 - Run `pwsh ./scripts/sync-qbittorrent-config.ps1` to sync config from `.env`.
-- The script restarts `qbittorrent` only when `qBittorrent.conf`, `categories.json`, or `watched_folders.json` changed and the service is running.
+- The script restarts `qbittorrent` only when `qBittorrent.conf`, `categories.json`, `watched_folders.json`, or `bootstrap.env` changed and the service is running.
 - Use `pwsh ./scripts/sync-qbittorrent-config.ps1 -SkipRestart` to sync without restart.
 - Use `pwsh ./scripts/sync-qbittorrent-config.ps1 -Verbose` to show password generation and config update details.
 - If `QBITTORRENT_CFG_WEBUI_PASSWORD_PBKDF2` is empty or missing, the script leaves any existing `WebUI\Password_PBKDF2` value unchanged.
-- If `QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT` is set, the script generates a PBKDF2-SHA512 (100000 iterations) hash in qBittorrent format.
+- If `QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT` is set, `sync-qbittorrent-config.ps1` generates a PBKDF2-SHA512 (100000 iterations) hash in qBittorrent format before container startup.
 
 Example custom overrides:
 ```env

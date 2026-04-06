@@ -214,6 +214,26 @@ function Get-JsonFromEnv {
     }
 }
 
+function ConvertTo-BashSingleQuotedValue {
+    param([string]$Value)
+
+    if ($null -eq $Value) {
+        return "''"
+    }
+
+    return "'" + $Value.Replace("'", "'\''") + "'"
+}
+
+function Write-Utf8FileNoBom {
+    param(
+        [string]$Path,
+        [string]$Content
+    )
+
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
+}
+
 
 $stackContext = Get-StackContext -ScriptRoot $PSScriptRoot
 
@@ -229,6 +249,7 @@ $qbittorrentConfigDir = Join-Path $configsRoot 'qBittorrent'
 $configPath = Join-Path $qbittorrentConfigDir 'qBittorrent.conf'
 $categoriesPath = Join-Path $qbittorrentConfigDir 'categories.json'
 $watchedFoldersPath = Join-Path $qbittorrentConfigDir 'watched_folders.json'
+$bootstrapEnvPath = Join-Path $qbittorrentConfigDir 'bootstrap.env'
 
 $mappings = @(
     @{ Section = 'AutoRun'; Key = 'enabled'; Env = 'QBITTORRENT_CFG_AUTORUN_ENABLED'; Default = 'false' },
@@ -300,6 +321,24 @@ $seedConfigContent = ([string]::Join([Environment]::NewLine, $seedLines.ToArray(
 $seedCategoriesContent = ($defaultCategoriesObject | ConvertTo-Json -Depth 20) + [Environment]::NewLine
 $seedWatchedFoldersContent = ($defaultWatchedFoldersObject | ConvertTo-Json -Depth 20) + [Environment]::NewLine
 
+$bootstrapEnvEntries = [ordered]@{
+    'QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT' = Get-EnvOrDefault -EnvMap $envMap -Key 'QBITTORRENT_CFG_WEBUI_PASSWORD_PLAINTEXT' -DefaultValue ''
+    'QBITTORRENT_CFG_DOWNLOADS_SAVE_PATH' = Get-EnvOrDefault -EnvMap $envMap -Key 'QBITTORRENT_CFG_DOWNLOADS_SAVE_PATH' -DefaultValue '/downloads/'
+    'QBITTORRENT_CFG_DOWNLOADS_TEMP_PATH' = Get-EnvOrDefault -EnvMap $envMap -Key 'QBITTORRENT_CFG_DOWNLOADS_TEMP_PATH' -DefaultValue '/downloads/incomplete/'
+    'QBITTORRENT_JACKETT_API_KEY' = Get-EnvOrDefault -EnvMap $envMap -Key 'QBITTORRENT_JACKETT_API_KEY' -DefaultValue ''
+    'QBITTORRENT_JACKETT_URL' = Get-EnvOrDefault -EnvMap $envMap -Key 'QBITTORRENT_JACKETT_URL' -DefaultValue 'http://jackett:9117'
+    'QBITTORRENT_JACKETT_THREAD_COUNT' = Get-EnvOrDefault -EnvMap $envMap -Key 'QBITTORRENT_JACKETT_THREAD_COUNT' -DefaultValue '20'
+    'QBITTORRENT_JACKETT_TRACKER_FIRST' = Get-EnvOrDefault -EnvMap $envMap -Key 'QBITTORRENT_JACKETT_TRACKER_FIRST' -DefaultValue 'false'
+    'QBITTORRENT_JACKETT_PLUGIN_URL' = Get-EnvOrDefault -EnvMap $envMap -Key 'QBITTORRENT_JACKETT_PLUGIN_URL' -DefaultValue 'https://raw.githubusercontent.com/qbittorrent/search-plugins/fa0be6abdc47b8622e8ec71a0d4427d9a7770eab/nova3/engines/jackett.py'
+    'WEBUI_PORT' = Get-EnvOrDefault -EnvMap $envMap -Key 'QBITTORRENT_WEBUI_PORT' -DefaultValue '8080'
+}
+
+$bootstrapEnvLines = foreach ($bootstrapEnvEntry in $bootstrapEnvEntries.GetEnumerator()) {
+    '{0}={1}' -f $bootstrapEnvEntry.Key, (ConvertTo-BashSingleQuotedValue -Value ([string]$bootstrapEnvEntry.Value))
+}
+
+$bootstrapEnvContent = ([string]::Join("`n", $bootstrapEnvLines)) + "`n"
+
 New-DirectoryIfMissing -Path $qbittorrentConfigDir
 New-DirectoryIfMissing -Path (Join-Path $qbittorrentConfigDir 'logs')
 New-DirectoryIfMissing -Path (Join-Path $qbittorrentConfigDir 'BT_backup')
@@ -316,6 +355,19 @@ New-DirectoryIfMissing -Path (Join-Path $downloadsRoot 'incomplete')
 New-FileIfMissing -Path $configPath -DefaultContent $seedConfigContent
 New-FileIfMissing -Path $categoriesPath -DefaultContent $seedCategoriesContent
 New-FileIfMissing -Path $watchedFoldersPath -DefaultContent $seedWatchedFoldersContent
+
+$bootstrapEnvChanged = $false
+if (-not (Test-Path -LiteralPath $bootstrapEnvPath)) {
+    Write-Utf8FileNoBom -Path $bootstrapEnvPath -Content $bootstrapEnvContent
+    $bootstrapEnvChanged = $true
+}
+else {
+    $bootstrapEnvOriginalContent = Get-Content -LiteralPath $bootstrapEnvPath -Raw
+    $bootstrapEnvChanged = $bootstrapEnvOriginalContent -ne $bootstrapEnvContent
+    if ($bootstrapEnvChanged) {
+        Write-Utf8FileNoBom -Path $bootstrapEnvPath -Content $bootstrapEnvContent
+    }
+}
 
 $originalLines = @(Get-Content -LiteralPath $configPath)
 $lineList = [System.Collections.Generic.List[string]]::new()
@@ -406,7 +458,7 @@ if ($watchedFoldersChanged) {
     [System.IO.File]::WriteAllText($watchedFoldersPath, $watchedFoldersUpdatedJson)
 }
 
-$anyChanges = $hasChanges -or $categoriesChanged -or $watchedFoldersChanged
+$anyChanges = $hasChanges -or $categoriesChanged -or $watchedFoldersChanged -or $bootstrapEnvChanged
 
 if ($anyChanges -and -not $SkipRestart) {
     if ($qbittorrentWasRunningBeforeChanges) {
@@ -440,6 +492,7 @@ elseif ($anyChanges) {
 Write-Host "qBittorrent.conf changed: $hasChanges"
 Write-Host "categories.json changed: $categoriesChanged"
 Write-Host "watched_folders.json changed: $watchedFoldersChanged"
+Write-Host "bootstrap.env changed: $bootstrapEnvChanged"
 
 if ($EmitStatus) {
     Write-Output ("SYNC_STATUS:qbittorrent:{0}" -f $anyChanges.ToString().ToLowerInvariant())

@@ -775,6 +775,26 @@ function New-StackReportPath {
     return Join-Path $logDir ("stack-test-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-summary.md')
 }
 
+function Convert-ToReportSafeText {
+    param([AllowNull()][string]$Value)
+
+    if ($null -eq $Value) {
+        return ''
+    }
+
+    return ($Value -replace 'ΓÇª|…', '...')
+}
+
+function Write-Utf8FileNoBom {
+    param(
+        [string]$Path,
+        [string]$Content
+    )
+
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
+}
+
 function Get-ComposeRenderText {
     $composeOutput = @(docker compose config --no-interpolate 2>&1)
     if ($LASTEXITCODE -ne 0) {
@@ -818,31 +838,6 @@ function Test-HttpEndpointStatus {
         [string]$Service,
         [string]$Url
     )
-
-    if ($Service -eq 'Jackett') {
-        try {
-            $response = Invoke-WebRequest -Uri $Url -MaximumRedirection 0 -SkipHttpErrorCheck -TimeoutSec 15 -ErrorAction Stop
-            return [pscustomobject]@{
-                Service = $Service
-                Url = $Url
-                StatusCode = [int]$response.StatusCode
-                Reachable = $true
-            }
-        }
-        catch {
-            $statusCode = -1
-            if ($_.Exception.PSObject.Properties.Name -contains 'Response' -and $null -ne $_.Exception.Response -and $_.Exception.Response.StatusCode) {
-                $statusCode = [int]$_.Exception.Response.StatusCode.value__
-            }
-
-            return [pscustomobject]@{
-                Service = $Service
-                Url = $Url
-                StatusCode = $statusCode
-                Reachable = ($statusCode -ge 200)
-            }
-        }
-    }
 
     $handler = [System.Net.Http.HttpClientHandler]::new()
     $handler.AllowAutoRedirect = $false
@@ -888,20 +883,26 @@ function Export-StackTestReport {
 
     $dockerAvailable = Test-DockerDaemonAvailable
     $composePsOutput = @()
+    $composeServicesRunning = $false
+    $runningServices = @()
     $endpointChecks = @()
     $qbittorrentNetworkMode = ''
     $expressvpnContainerId = ''
     $qbittorrentSharesExpressvpn = $false
     if ($dockerAvailable) {
-        $composePsOutput = @(docker compose ps 2>&1)
+        $composePsOutput = @((docker compose ps 2>&1) | ForEach-Object { Convert-ToReportSafeText -Value ([string]$_) })
+        $runningServices = @((docker compose ps --status running --services 2>$null) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+        $composeServicesRunning = $runningServices.Count -gt 0
         $expressvpnContainerId = (@(docker inspect --format '{{.Id}}' expressvpn 2>$null) -join '').Trim()
         $qbittorrentNetworkMode = (@(docker inspect --format '{{.HostConfig.NetworkMode}}' qbittorrent 2>$null) -join '').Trim()
         if (-not [string]::IsNullOrWhiteSpace($expressvpnContainerId)) {
             $qbittorrentSharesExpressvpn = ($qbittorrentNetworkMode -eq ("container:{0}" -f $expressvpnContainerId))
         }
-        $endpointChecks = @(Get-ServiceEndpoints | ForEach-Object {
-            Test-HttpEndpointStatus -Service $_.Service -Url $_.Url
-        })
+        if ($composeServicesRunning) {
+            $endpointChecks = @(Get-ServiceEndpoints | ForEach-Object {
+                Test-HttpEndpointStatus -Service $_.Service -Url $_.Url
+            })
+        }
     }
 
     $lines = @(
@@ -973,9 +974,17 @@ function Export-StackTestReport {
             '```',
             ''
         )
+
+        if (-not $composeServicesRunning) {
+            $lines += @(
+                '- No running compose services were detected at report time.',
+                '- This is expected immediately after `pwsh ./scripts/torrents-stack.ps1 test-all`, because the sequence ends with `Stop` and `Clean (end)`.',
+                ''
+            )
+        }
     }
 
-    if (-not [string]::IsNullOrWhiteSpace($qbittorrentNetworkMode)) {
+    if ($composeServicesRunning -and -not [string]::IsNullOrWhiteSpace($qbittorrentNetworkMode)) {
         $lines += @(
             '### Live runtime checks',
             '',
@@ -989,16 +998,26 @@ function Export-StackTestReport {
 
         $lines += ''
     }
+    elseif ($dockerAvailable) {
+        $lines += @(
+            '### Live runtime checks',
+            '',
+            '- Skipped because no services were running when the report was generated.',
+            ''
+        )
+    }
 
     $lines += @(
         '## Recommendations',
         '',
         '1. Use `preflight` before runtime commands when testing from a fresh shell or after Docker Desktop restarts.',
         '2. Use `report` when you need a test artifact; it avoids writing expanded secret values from `.env`.',
-        '3. If the stack is not already running, run `pwsh ./scripts/torrents-stack.ps1 start` and then `status -VerboseAuth` for live endpoint verification.'
+        '3. `test-all` is destructive by design and leaves the stack stopped and cleaned; run `pwsh ./scripts/torrents-stack.ps1 start` before collecting live runtime checks after a full sequence.',
+        '4. If the stack is running, use `pwsh ./scripts/torrents-stack.ps1 status -VerboseAuth` for live endpoint verification.'
     )
 
-    $lines | Set-Content -LiteralPath $resolvedReportPath
+    $reportContent = ([string]::Join("`n", ($lines | ForEach-Object { Convert-ToReportSafeText -Value ([string]$_) }))) + "`n"
+    Write-Utf8FileNoBom -Path $resolvedReportPath -Content $reportContent
     Write-Host ("[Report] Sanitized stack test report written to: {0}" -f $resolvedReportPath) -ForegroundColor Green
     return $resolvedReportPath
 }
