@@ -275,7 +275,7 @@ HEALTHCHECK_START_PERIOD=45s
 	- Expected: stack returns to last tagged baseline
 
 ## Backup and restore
-The repository includes a monthly reminder workflow that opens a backup/restore verification issue:
+The repository includes a manually runnable workflow for opening a backup/restore verification issue:
 - `Backup Restore Reminder` workflow: https://github.com/LBates2000/torrents-stack-expressvpn/actions/workflows/backup-restore-reminder.yml
 
 The bundled PowerShell helpers also respect `HOST_CONFIGS_DIR` and `HOST_DOWNLOADS_DIR`, so backup and restore follow the same directories used by the sync scripts and compose mounts:
@@ -300,7 +300,7 @@ pwsh ./scripts/restore-configs.ps1 -Archive .\backups\stack-backup-<timestamp>.z
 - Use GitHub issue templates for monthly maintenance and backup restore drills.
 - License: MIT (`LICENSE`).
 - Contribution guide: see `CONTRIBUTING.md`.
-- Scheduled image tag drift check: `.github/workflows/image-tag-drift.yml`.
+- Manual image tag drift check: `.github/workflows/image-tag-drift.yml`.
 
 ## Author
 - Lawrence Bates (<Lawrence.Bates@gmail.com>)
