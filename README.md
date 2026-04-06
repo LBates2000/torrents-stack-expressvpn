@@ -154,8 +154,9 @@ docker compose up --force-recreate -d
 - The PowerShell scripts use the same shared path resolution logic as the compose file, so backups, validation, and config sync all follow those overrides consistently.
 
 ## Image pinning
-- Images default to `latest` in `docker-compose.yml` via environment-backed tags.
+- Images are pinned by default in `.env.example` and in the compose fallback values.
 - Override image tags in `.env` using `EXPRESSVPN_IMAGE_TAG`, `FLARESOLVERR_IMAGE_TAG`, `JACKETT_IMAGE_TAG`, and `QBITTORRENT_IMAGE_TAG`.
+- The scheduled drift check compares configured tags against the current upstream `latest` image so pin updates can be reviewed deliberately.
 
 ## Advanced env overrides
 - Network driver: `APP_NET_DRIVER` (default: `bridge`)
