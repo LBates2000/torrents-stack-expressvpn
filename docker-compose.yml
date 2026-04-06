@@ -48,7 +48,7 @@ services:
   # Only qbittorrent uses network_mode: service:expressvpn.
   # Jackett and FlareSolverr run on app_net with their own port mappings.
   expressvpn:
-    image: polkaned/expressvpn:${EXPRESSVPN_IMAGE_TAG:-latest}
+    image: polkaned/expressvpn:${EXPRESSVPN_IMAGE_TAG:-5.1.0.12141.69cfc6c3}
     <<: [*defaults, *common-dns]
     container_name: ${EXPRESSVPN_CONTAINER_NAME:-expressvpn}
     cap_add:
@@ -84,7 +84,7 @@ services:
       - com.torrents-stack.project=expressvpn-stack
 
   flaresolverr:
-    image: ghcr.io/flaresolverr/flaresolverr:${FLARESOLVERR_IMAGE_TAG:-latest}
+    image: ghcr.io/flaresolverr/flaresolverr:${FLARESOLVERR_IMAGE_TAG:-v3.4.6}
     <<: [*defaults, *common-dns]
     container_name: ${FLARESOLVERR_CONTAINER_NAME:-flaresolverr}
     ports:
@@ -109,7 +109,7 @@ services:
       - com.torrents-stack.project=expressvpn-stack
 
   jackett:
-    image: lscr.io/linuxserver/jackett:${JACKETT_IMAGE_TAG:-latest}
+    image: lscr.io/linuxserver/jackett:${JACKETT_IMAGE_TAG:-v0.24.1542-ls366}
     <<: [*defaults, *common-dns]
     container_name: ${JACKETT_CONTAINER_NAME:-jackett}
     ports:
@@ -163,7 +163,7 @@ services:
       - com.torrents-stack.project=expressvpn-stack
 
   qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:${QBITTORRENT_IMAGE_TAG:-latest}
+    image: lscr.io/linuxserver/qbittorrent:${QBITTORRENT_IMAGE_TAG:-5.1.4-r2-ls448}
     <<: [*defaults, *qbittorrent-command]
     container_name: ${QBITTORRENT_CONTAINER_NAME:-qbittorrent}
     network_mode: "service:expressvpn"
