@@ -47,6 +47,7 @@ pwsh ./scripts/torrents-stack.ps1 test-all
 pwsh ./scripts/torrents-stack.ps1 report
 ```
 
+- Local Pester-based test runs require Pester 5.7.1: `Install-Module Pester -Scope CurrentUser -Force -SkipPublisherCheck -RequiredVersion 5.7.1`.
 - The generated report reflects current runtime state at report time.
 - If you run `report` immediately after `test-all`, expect no running services in the compose state section because the test sequence intentionally cleans up at the end.
 - If you need live endpoint checks in the report after a full sequence, run `pwsh ./scripts/torrents-stack.ps1 start` before `report`.

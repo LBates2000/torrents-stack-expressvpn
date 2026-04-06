@@ -810,7 +810,18 @@ function Invoke-RepoPesterTests {
     if (Test-Path -LiteralPath $testPath) {
         $testFiles = @(Get-ChildItem -LiteralPath $testPath -Filter '*.Tests.ps1' -File | Sort-Object -Property Name | ForEach-Object { $_.Name })
     }
-    $output = @(pwsh -NoProfile -Command "Invoke-Pester -Path './tests'" 2>&1)
+    $requiredPesterVersion = '5.7.1'
+    $pesterCommand = @"
+$requiredVersion = [version]'$requiredPesterVersion'
+$availableModule = Get-Module -ListAvailable -Name Pester | Sort-Object Version -Descending | Select-Object -First 1
+if (-not $availableModule -or $availableModule.Version -lt $requiredVersion) {
+    throw "Pester $requiredPesterVersion or newer is required. Install it with: Install-Module Pester -Scope CurrentUser -Force -SkipPublisherCheck -RequiredVersion $requiredPesterVersion"
+}
+
+Import-Module Pester -MinimumVersion $requiredPesterVersion -Force
+Invoke-Pester -Path './tests'
+"@
+    $output = @(pwsh -NoProfile -Command $pesterCommand 2>&1)
 
     return [pscustomobject]@{
         Output = $output
